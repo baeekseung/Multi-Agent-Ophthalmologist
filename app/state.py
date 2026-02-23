@@ -18,13 +18,13 @@ class Question(TypedDict):
 
 
 class ExpertOpinion(BaseModel):
-    expected_disease: str = Field(
-        description="The most likely ophthalmic disease or condition expected for the patient, inferred from the consultation conversation analysis. Provide a specific disease name.")
+    expected_disease: list[str] = Field(
+        description="The most likely ophthalmic disease or condition expected for the patient, inferred from the consultation conversation analysis. Provide specific disease names.")
     diagnosis_reasoning: str = Field(
         description="A clear and concise explanation for why the expected_disease was selected, based on the patient's consultation details and medical reasoning.")
     required_information: Optional[list[str]] = Field(
         default=None,
-        description="Additional information or responses that the patient should provide to improve diagnostic certainty. List specific questions or details needed.")
+        description="Additional information or responses that the patient should provide to improve diagnostic certainty. List specific questions or details needed. If no additional information is needed, set to None.")
 
 
 class ConsensusDecision(BaseModel):
@@ -37,6 +37,13 @@ class ConsensusDecision(BaseModel):
 class FinalMidTermDiagnosisResult(BaseModel):
     diagnosis_result: str = Field(
         description="The final diagnosis result when consensus is reached, based on the expert opinions and consultation summary. Be sure to include: 1) a clear summary of the experts' opinions and their reasoning, 2) a detailed explanation of any additional information requested by the experts, specifying exactly what should be further asked of the patient and why, and 3) Whether additional analysis is required after collecting supplementary information.")
+    consultation_sufficient: bool = Field(
+        description="""진료상담 종료 여부 판단.
+        True: 모든 전문의의 required_information이 None이고, 예상 질병이 1~2개로 명확하며,
+              환자 기본정보(나이/성별/증상/과거력)가 모두 수집된 경우.
+        False: 하나 이상의 전문의가 required_information을 제시하거나,
+               감별 진단이 필요하거나, 핵심 정보가 누락된 경우. 불확실하면 False."""
+    )
 
 
 class SupervisorResponse(BaseModel):
@@ -58,3 +65,4 @@ class MainState(AgentState):
     mid_term_diagnosis_summary: NotRequired[str]
     expert_responses_received: NotRequired[int]
     expert_responses_expected: NotRequired[int]
+    final_report: NotRequired[str]  # generate_final_report 노드가 생성하는 최종 진단서

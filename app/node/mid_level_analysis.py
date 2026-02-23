@@ -124,20 +124,42 @@ async def summarize_consensus_agent(state: MainState) -> Command:
     response: FinalMidTermDiagnosisResult = await chain.ainvoke({"chat_history": chat_history})
 
     print(f"## SUMMARIZE_CONSENSUS: Final diagnosis result:\n{response.diagnosis_result}\n")
+    print(f"## SUMMARIZE_CONSENSUS: Consultation sufficient: {response.consultation_sufficient}\n")
 
-    # consultation_agent에게 전달할 메시지 구성
-    expert_opinion_message = f"## previous_consultation_summary: {consultation_summary}\n\n"
-    expert_opinion_message += f"## expert_opinion: {response.diagnosis_result}"
+    # supervisor_messages 초기화 (공통)
+    remove_supervisor_messages = [RemoveMessage(id=m.id) for m in state.get("supervisor_messages", [])]
 
-    return Command(
-        update={
-            "mid_term_diagnosis_summary": response.diagnosis_result,
-            "messages": [HumanMessage(content=expert_opinion_message, name="expert")],
-            "consultation_next": "patient_input",
-            "supervisor_messages": [RemoveMessage(id=m.id) for m in state.get("supervisor_messages", [])]
-        },
-        goto="consultation_agent",
-    )
+    if response.consultation_sufficient:
+        # 상담 충분 → 진단서 생성 후 종료
+        return Command(
+            update={
+                "mid_term_diagnosis_summary": response.diagnosis_result,
+                "supervisor_messages": remove_supervisor_messages,
+            },
+            goto="generate_final_report",
+        )
+    else:
+        # 추가 상담 필요 → consultation_agent 복귀
+        expert_opinion_message = (
+            f"## previous_consultation_summary: {consultation_summary}\n\n"
+            f"## expert_opinion: {response.diagnosis_result}"
+        )
+        # 2차 라운드 시작 전 expert 메시지도 초기화하여 supervisor가 라운드를 명확히 구분하도록 함
+        remove_expert1 = [RemoveMessage(id=m.id) for m in state.get("expert1_messages", [])]
+        remove_expert2 = [RemoveMessage(id=m.id) for m in state.get("expert2_messages", [])]
+        remove_expert3 = [RemoveMessage(id=m.id) for m in state.get("expert3_messages", [])]
+        return Command(
+            update={
+                "mid_term_diagnosis_summary": response.diagnosis_result,
+                "messages": [HumanMessage(content=expert_opinion_message, name="expert")],
+                "consultation_next": "patient_input",
+                "supervisor_messages": remove_supervisor_messages,
+                "expert1_messages": remove_expert1,
+                "expert2_messages": remove_expert2,
+                "expert3_messages": remove_expert3,
+            },
+            goto="consultation_agent",
+        )
 
 MEMBERS = ["evaluate_consensus_agent", "summarize_consensus_agent"] + EXPERT_NAMES
 
@@ -185,7 +207,18 @@ async def supervisor_agent_node(state: MainState) -> Command:
 
         for node_name, instruction in next_and_instruction.items():
             if node_name in EXPERT_NAMES:
-                instruction_content = f"## consultation_summary:\n{consultation_summary}\n\n" + f"## supervisor's instruction:\n{instruction}"
+                # 2차+ 라운드: 이전 중간분석 내용과 추가 상담 내용을 함께 제공하여 진단 갱신 요청
+                if mid_term_diagnosis_summary:
+                    instruction_content = (
+                        f"## 이전 중간 진단 분석 내용:\n{mid_term_diagnosis_summary}\n\n"
+                        f"## 추가 수집된 진료상담 내용:\n{consultation_summary}\n\n"
+                        f"## supervisor's instruction:\n{instruction}"
+                    )
+                else:
+                    instruction_content = (
+                        f"## consultation_summary:\n{consultation_summary}\n\n"
+                        f"## supervisor's instruction:\n{instruction}"
+                    )
                 existing_messages = state.get(f"{node_name}_messages", [])
                 sends.append(Send(
                     node_name,

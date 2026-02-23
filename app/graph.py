@@ -16,6 +16,7 @@ from app.node.mid_level_analysis import (
     evaluate_consensus_agent,
     summarize_consensus_agent,
 )
+from app.node.generate_final_report import generate_final_report_node
 
 async def build_graph():
     workflow = StateGraph(MainState)
@@ -31,6 +32,7 @@ async def build_graph():
     workflow.add_node("expert3", expert3_agent)
     workflow.add_node("evaluate_consensus_agent", evaluate_consensus_agent)
     workflow.add_node("summarize_consensus_agent", summarize_consensus_agent)
+    workflow.add_node("generate_final_report", generate_final_report_node)
 
     workflow.set_entry_point("consultation_agent")
 
