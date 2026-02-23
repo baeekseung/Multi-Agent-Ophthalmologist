@@ -1,0 +1,11 @@
+# LLM & Agent 프레임워크
+langchain
+langchain-openai
+langgraph
+langchain-core
+
+# 환경 변수
+python-dotenv
+
+# 기타 의존성
+typing-extensions
