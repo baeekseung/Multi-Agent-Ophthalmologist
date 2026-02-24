@@ -55,6 +55,7 @@ class SupervisorResponse(BaseModel):
 class MainState(AgentState):
     consultation_next: NotRequired[str]
     consultation_summary: NotRequired[str]
+    consultation_turn: NotRequired[int] = 1
 
     supervisor_messages: Annotated[list[AnyMessage], add_messages]
     expert1_messages: Annotated[list[AnyMessage], add_messages]

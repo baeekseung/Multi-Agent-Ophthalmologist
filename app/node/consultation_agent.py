@@ -32,12 +32,10 @@ def update_questions(questions: list[Question], tool_call_id: Annotated[str, Inj
     if all_completed:
         print("모든 질문이 완료되었습니다.")
         return Command(update={
-            "messages": [ToolMessage(content=f"Updated question list to {questions}", tool_call_id=tool_call_id), SystemMessage(content="모든 질문이 완료되었습니다.", name="expert")],
-            "consultation_next": "summarize_consultation"})
+            "messages": [ToolMessage(content=f"Updated question list to {questions}", tool_call_id=tool_call_id), SystemMessage(content="모든 질문이 완료되었습니다.", name="expert")]})
     else:
         return Command(update={
-            "messages": [ToolMessage(content=f"Updated question list to {questions}", tool_call_id=tool_call_id)],
-            "consultation_next": "patient_response"})
+            "messages": [ToolMessage(content=f"Updated question list to {questions}", tool_call_id=tool_call_id)]})
 
 
 consultation_agent = create_agent(

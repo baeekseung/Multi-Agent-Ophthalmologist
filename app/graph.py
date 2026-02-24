@@ -3,6 +3,7 @@ load_dotenv()
 
 from langgraph.graph import StateGraph
 from langgraph.checkpoint.memory import MemorySaver
+from app.database.connection import init_db
 
 from app.state import MainState
 from app.node.patient_response import patient_response_node
@@ -19,6 +20,7 @@ from app.node.mid_level_analysis import (
 from app.node.generate_final_report import generate_final_report_node
 
 async def build_graph():
+    init_db()  # 테이블이 없으면 생성
     workflow = StateGraph(MainState)
 
     workflow.add_node("patient_response", patient_response_node)

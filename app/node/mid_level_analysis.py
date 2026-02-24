@@ -25,7 +25,7 @@ MAX_RECONSULT_ROUNDS = 3
 async def create_expert_node(state: MainState, expert_name: str, model) -> Command:
     print(f"AGENT CALLED: {expert_name} agent called")
     expert_messages = state.get(f"{expert_name}_messages", [])
-    # print(f"EXPERT MESSAGES: {expert_messages}\n")
+    print(f"## {expert_name} messages: {messages_pretty_print(expert_messages)}\n")
     expert_agent = create_agent(
         model=model,
         tools=[],
@@ -33,11 +33,12 @@ async def create_expert_node(state: MainState, expert_name: str, model) -> Comma
         state_schema=MainState,
         response_format=ExpertOpinion
     )
-    response = await expert_agent.ainvoke({f"messages": expert_messages})
+    response = await expert_agent.ainvoke({"messages": expert_messages})
 
     return Command(
         update={
-            f"{expert_name}_messages": [AIMessage(content=response['messages'][-1].content, name=expert_name)],
+            # f"{expert_name}_messages": [AIMessage(content=response["messages"][-1].content, name=expert_name)],
+            f"{expert_name}_messages": response['messages'],
             "supervisor_messages": [HumanMessage(content=f"[{expert_name} opinion]:\n{response['messages'][-1].content}", name=expert_name)],
         },
         goto="supervisor",
@@ -52,7 +53,7 @@ EXPERT_NAMES = ["expert1", "expert2", "expert3"]
 
 async def evaluate_consensus_agent(state: MainState) -> Command:
     """전문의 의견을 평가하여 합의 여부를 판단."""
-    print(f"AGENT CALLED: evaluate_consensus called\n")
+    print(f"[AGENT CALLED]: evaluate_consensus called")
 
     expert_opinions = ""
     for name in EXPERT_NAMES:
@@ -60,7 +61,7 @@ async def evaluate_consensus_agent(state: MainState) -> Command:
         if messages:
             expert_opinions += f"[{name} Opinion]\n{messages[-1].content}\n\n"
 
-    print(f"EVALUATE_CONSENSUS: Expert opinions:\n{expert_opinions}\n")
+    print(f"## Expert opinions:\n{expert_opinions}\n")
 
     llm = ChatOpenAI(model="gpt-4o", temperature=0)
     structured_llm = llm.with_structured_output(ConsensusDecision)
@@ -79,10 +80,10 @@ async def evaluate_consensus_agent(state: MainState) -> Command:
     content = (
         f"[Consensus Evaluation Result]\n"
         f"합의 도달: {'합의 도달' if response.consensus_reached else '합의 미달'}\n"
-        f"분석 근거: {response.reasoning}\n"
+        f"결정 근거: {response.reasoning}\n"
     )
 
-    print(f"EVALUATE_CONSENSUS: Result:\n{content}\n")
+    print(f"## Evaluate consensus result:\n{content}\n")
 
     return Command(
         update={
@@ -92,9 +93,10 @@ async def evaluate_consensus_agent(state: MainState) -> Command:
     )
 
 async def summarize_consensus_agent(state: MainState) -> Command:
-    print(f"[AGENT CALLED]: summarize_consensus called")
+    print(f"[AGENT CALLED]: Summarize consensus called")
     supervisor_messages = state.get("supervisor_messages", [])
     consultation_summary = state.get("consultation_summary", "")
+    consultation_turn = state.get("consultation_turn", 1)
 
     # supervisor_messages에서 전문의 의견과 supervisor 지시사항 추출
     chat_history = ""
@@ -123,18 +125,18 @@ async def summarize_consensus_agent(state: MainState) -> Command:
     chain = prompt | structured_llm
     response: FinalMidTermDiagnosisResult = await chain.ainvoke({"chat_history": chat_history})
 
-    print(f"## SUMMARIZE_CONSENSUS: Final diagnosis result:\n{response.diagnosis_result}\n")
-    print(f"## SUMMARIZE_CONSENSUS: Consultation sufficient: {response.consultation_sufficient}\n")
+    print(f"## SUMMARIZE_CONSENSUS: Final diagnosis result:\n{response.diagnosis_result}")
+    print(f"## SUMMARIZE_CONSENSUS: Consultation sufficient: {response.consultation_sufficient}")
 
     # supervisor_messages 초기화 (공통)
-    remove_supervisor_messages = [RemoveMessage(id=m.id) for m in state.get("supervisor_messages", [])]
+    # remove_supervisor_messages = [RemoveMessage(id=m.id) for m in state.get("supervisor_messages", [])]
 
     if response.consultation_sufficient:
         # 상담 충분 → 진단서 생성 후 종료
         return Command(
             update={
                 "mid_term_diagnosis_summary": response.diagnosis_result,
-                "supervisor_messages": remove_supervisor_messages,
+                "supervisor_messages": [HumanMessage(content=f"이번 Mid-level analysis 결과: {response.diagnosis_result}", name="summarize_consensus_agent")],
             },
             goto="generate_final_report",
         )
@@ -145,18 +147,18 @@ async def summarize_consensus_agent(state: MainState) -> Command:
             f"## expert_opinion: {response.diagnosis_result}"
         )
         # 2차 라운드 시작 전 expert 메시지도 초기화하여 supervisor가 라운드를 명확히 구분하도록 함
-        remove_expert1 = [RemoveMessage(id=m.id) for m in state.get("expert1_messages", [])]
-        remove_expert2 = [RemoveMessage(id=m.id) for m in state.get("expert2_messages", [])]
-        remove_expert3 = [RemoveMessage(id=m.id) for m in state.get("expert3_messages", [])]
+        # remove_expert1 = [RemoveMessage(id=m.id) for m in state.get("expert1_messages", [])]
+        # remove_expert2 = [RemoveMessage(id=m.id) for m in state.get("expert2_messages", [])]
+        # remove_expert3 = [RemoveMessage(id=m.id) for m in state.get("expert3_messages", [])]
         return Command(
             update={
                 "mid_term_diagnosis_summary": response.diagnosis_result,
                 "messages": [HumanMessage(content=expert_opinion_message, name="expert")],
-                "consultation_next": "patient_input",
-                "supervisor_messages": remove_supervisor_messages,
-                "expert1_messages": remove_expert1,
-                "expert2_messages": remove_expert2,
-                "expert3_messages": remove_expert3,
+                "supervisor_messages": [HumanMessage(content=f"{consultation_turn}번째 Mid-level analysis 결과: {response.diagnosis_result}\n\n추가적으로 요청하신 질문에 대해 답변을 받아 다시 Mid-level analysis를 진행합니다.", name="summarize_consensus_agent")],
+                "consultation_turn": consultation_turn + 1,
+                # "expert1_messages": remove_expert1,
+                # "expert2_messages": remove_expert2,
+                # "expert3_messages": remove_expert3,
             },
             goto="consultation_agent",
         )
@@ -170,6 +172,7 @@ async def supervisor_agent_node(state: MainState) -> Command:
     print(messages_pretty_print(supervisor_messages))
     consultation_summary = state.get("consultation_summary", "")
     mid_term_diagnosis_summary = state.get("mid_term_diagnosis_summary", "")
+    consultation_turn = state.get("consultation_turn", 1)
 
     # 최대 재질의 횟수 초과 시 강제 종합
     if round_number >= MAX_RECONSULT_ROUNDS:
@@ -177,7 +180,7 @@ async def supervisor_agent_node(state: MainState) -> Command:
         return Command(
             goto="summarize_consensus_agent",
             update={
-                "supervisor_messages": [AIMessage(content="최대 반복 횟수에 도달했습니다. 현재까지의 의견을 종합합니다.", name="supervisor")],
+                "supervisor_messages": [AIMessage(content=f"최대 반복 횟수에 도달했습니다. {consultation_turn}번째 Mid-level analysis 결과를 작성합니다.", name="supervisor")],
                 "round_number": 0
             }
         )
@@ -186,14 +189,14 @@ async def supervisor_agent_node(state: MainState) -> Command:
     agent = create_agent(
         model=llm,
         tools=[],
-        system_prompt=SUPERVISOR_AGENT_PROMPT.format(mid_term_diagnosis_summary=mid_term_diagnosis_summary),
+        system_prompt=SUPERVISOR_AGENT_PROMPT,
         response_format=SupervisorResponse
     )
 
     response = await agent.ainvoke({"messages": supervisor_messages})
     response_json = json.loads(response['messages'][-1].content)
 
-    print(f"## SUPERVISOR: Response next_and_instruction:\n{response_json['next_and_instruction']}\n")
+    print(f"## Supervisor response next_and_instruction:\n{response_json['next_and_instruction']}\n")
 
     # SupervisorResponse 파싱
     next_and_instruction = response_json['next_and_instruction']
@@ -210,7 +213,7 @@ async def supervisor_agent_node(state: MainState) -> Command:
                 # 2차+ 라운드: 이전 중간분석 내용과 추가 상담 내용을 함께 제공하여 진단 갱신 요청
                 if mid_term_diagnosis_summary:
                     instruction_content = (
-                        f"## 이전 중간 진단 분석 내용:\n{mid_term_diagnosis_summary}\n\n"
+                        f"## {consultation_turn-1}번째 Mid-level analysis 결과:\n{mid_term_diagnosis_summary}\n\n"
                         f"## 추가 수집된 진료상담 내용:\n{consultation_summary}\n\n"
                         f"## supervisor's instruction:\n{instruction}"
                     )

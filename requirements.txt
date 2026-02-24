@@ -7,5 +7,9 @@ langchain-core
 # 환경 변수
 python-dotenv
 
+# 데이터베이스
+sqlalchemy
+psycopg2-binary
+
 # 기타 의존성
 typing-extensions

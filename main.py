@@ -5,7 +5,6 @@ from langchain_core.messages import HumanMessage
 from app.prompts import INITIAL_CONSULTATION_MESSAGE
 
 async def main(thread_id: str):
-    # 그래프 빌드 (await 필요)
     graph = await build_graph()
     
     # 그래프 실행
