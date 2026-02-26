@@ -51,6 +51,17 @@ class SupervisorResponse(BaseModel):
         description="""Determines the next node(s) to execute and the corresponding instructions for each node. Returns a dictionary mapping node names to instructions. The node name should be one of: expert1, expert2, expert3, evaluate_consensus_agent, or summarize_consensus_agent. The instruction is the message to be sent to the node."""
     )
 
+class Todo(TypedDict):
+    """A structured task item for tracking progress through complex workflows.
+
+    Attributes:
+        content: Short, specific description of the task
+        status: Current state - pending, in_progress, or completed
+    """
+
+    content: str
+    status: Literal["pending", "in_progress", "completed"]
+
 
 class MainState(AgentState):
     consultation_next: NotRequired[str]
@@ -66,4 +77,28 @@ class MainState(AgentState):
     mid_term_diagnosis_summary: NotRequired[str]
     expert_responses_received: NotRequired[int]
     expert_responses_expected: NotRequired[int]
+    diagnosis_research_result: NotRequired[str]  # diagnosis_agent가 생성한 심층 연구 결과
     final_report: NotRequired[str]  # generate_final_report 노드가 생성하는 최종 진단서
+
+
+def file_reducer(left, right):
+    if left is None:
+        return right
+    elif right is None:
+        return left
+    else:
+        return {**left, **right}
+
+
+class DeepAgentState(AgentState):
+    """Extended agent state that includes task tracking and virtual file system.
+
+    Inherits from LangGraph's AgentState and adds:
+    - todos: List of Todo items for task planning and progress tracking
+    - files: Virtual file system stored as dict mapping filenames to content
+    """
+
+    # 작업 플래닝 및 진행 상황 추적을 위한 Todo 리스트 필드
+    todos: NotRequired[list[Todo]]
+    # 파일명과 내용 매핑, file_reducer로 병합되는 가상 파일 시스템 필드
+    files: Annotated[NotRequired[dict[str, str]], file_reducer]

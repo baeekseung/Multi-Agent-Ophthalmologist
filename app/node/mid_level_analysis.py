@@ -138,7 +138,7 @@ async def summarize_consensus_agent(state: MainState) -> Command:
                 "mid_term_diagnosis_summary": response.diagnosis_result,
                 "supervisor_messages": [HumanMessage(content=f"이번 Mid-level analysis 결과: {response.diagnosis_result}", name="summarize_consensus_agent")],
             },
-            goto="generate_final_report",
+            goto="diagnosis_agent",
         )
     else:
         # 추가 상담 필요 → consultation_agent 복귀

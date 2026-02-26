@@ -75,11 +75,13 @@ async def generate_final_report_node(state: MainState) -> Command:
 
     consultation_summary = state.get("consultation_summary", "")
     mid_term_diagnosis_summary = state.get("mid_term_diagnosis_summary", "")
+    diagnosis_research = state.get("diagnosis_research_result", "")
 
     response = await generate_final_report_agent.ainvoke({
         "messages": [HumanMessage(content=(
             f"## consultation_summary:\n{consultation_summary}\n\n"
-            f"## expert_diagnosis_summary:\n{mid_term_diagnosis_summary}"
+            f"## expert_diagnosis_summary:\n{mid_term_diagnosis_summary}\n\n"
+            f"## diagnosis_research_result:\n{diagnosis_research}"
         ))],
         "consultation_summary": consultation_summary,  # InjectedState 주입 소스
     })

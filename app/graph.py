@@ -4,6 +4,7 @@ load_dotenv()
 from langgraph.graph import StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 from app.database.connection import init_db
+from langgraph.graph import END
 
 from app.state import MainState
 from app.node.patient_response import patient_response_node
@@ -17,6 +18,7 @@ from app.node.mid_level_analysis import (
     evaluate_consensus_agent,
     summarize_consensus_agent,
 )
+from app.node.diagnosis_agent import diagnosis_agent_node
 from app.node.generate_final_report import generate_final_report_node
 
 async def build_graph():
@@ -34,7 +36,10 @@ async def build_graph():
     workflow.add_node("expert3", expert3_agent)
     workflow.add_node("evaluate_consensus_agent", evaluate_consensus_agent)
     workflow.add_node("summarize_consensus_agent", summarize_consensus_agent)
+
+    workflow.add_node("diagnosis_agent", diagnosis_agent_node)
     workflow.add_node("generate_final_report", generate_final_report_node)
+    workflow.add_node("end", END)
 
     workflow.set_entry_point("consultation_agent")
 
