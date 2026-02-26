@@ -11,7 +11,10 @@ from langgraph.types import Command
 from typing_extensions import Annotated, Literal
 
 from app.utils.get_current_time import get_current_time
+from app.utils.logger import get_logger
 from app.prompts import SUMMARIZE_WEB_SEARCH_PROMPT, MEDICAL_RESEARCHER_INSTRUCTIONS
+
+logger = get_logger(__name__)
 
 tavily_client = TavilyClient()
 def get_web_search(search_query: str, max_results: int = 2, topic: Literal["general", "news", "finance"] = "general", include_raw_content: bool = True) -> dict:
@@ -44,7 +47,7 @@ def summarize_webpage_contents(search_query: str, webpage_contents: list[str]) -
 
     except Exception as e:
         # 실패시 기본 요약 객체 리스트 반환
-        print(f"Batch processing failed: {e}, falling back to sequential processing")
+        logger.warning(f"Batch 처리 실패, 순차 처리로 전환: {e}")
         return [
             Summary(
                 summary=(content[:1000] + "..." if len(content) > 1000 else content),
@@ -92,6 +95,8 @@ def tavily_search(query: str, tool_call_id: Annotated[str, InjectedToolCallId], 
     Returns:
         검색 결과 요약을 제공하는 Command
     """
+    logger.info(f"[TOOL] tavily_search: '{query}' (max_results={max_results})")
+
     # 검색 실행
     search_results = get_web_search(
         query,
@@ -110,6 +115,8 @@ def tavily_search(query: str, tool_call_id: Annotated[str, InjectedToolCallId], 
     # 도구 메시지를 위한 요약 생성
     summary_text = f"""Found {len(processed_results)} result(s) for '{query}':
 {chr(10).join(summaries)}"""
+
+    logger.debug(f"[TOOL] tavily_search 결과 {len(processed_results)}건:\n{summary_text[:500]}")
 
     return Command(
         update={

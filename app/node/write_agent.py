@@ -7,7 +7,10 @@ from langchain_openai import ChatOpenAI
 from langgraph.types import Command
 from typing_extensions import Annotated
 
+from app.utils.logger import get_logger
 from app.prompts import WRITE_AGENT_INSTRUCTIONS
+
+logger = get_logger(__name__)
 
 
 @tool(parse_docstring=True)
@@ -25,6 +28,7 @@ def draft_section_tool(section_name: str, draft_content: str) -> str:
     Returns:
         초안이 기록되었음을 확인하는 메시지
     """
+    logger.debug(f"[TOOL] draft_section_tool: [{section_name}] ({len(draft_content)}자)")
     return f"Draft recorded for [{section_name}]: {draft_content}"
 
 
@@ -67,6 +71,8 @@ def submit_report(
 ## 5. 추가 검사 권고사항
 {additional_tests}
 """
+    logger.info(f"[TOOL] submit_report: diagnosis_report.md 저장 ({len(report_md)}자)")
+
     return Command(
         update={
             "files": {"diagnosis_report.md": report_md},

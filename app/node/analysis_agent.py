@@ -9,7 +9,10 @@ from langgraph.types import Command
 from typing_extensions import Annotated, Literal
 
 from app.state import DeepAgentState
+from app.utils.logger import get_logger
 from app.prompts import ANALYSIS_AGENT_INSTRUCTIONS
+
+logger = get_logger(__name__)
 
 
 @tool(description="가상 파일 시스템에서 수집된 모든 연구 파일의 목록과 내용을 반환합니다. 파일이 없으면 task description에 포함된 검색 결과를 분석하세요.")
@@ -37,6 +40,7 @@ def analyze_tool(analysis: str) -> str:
     Returns:
         분석 내용이 기록되었음을 확인하는 메시지
     """
+    logger.debug(f"[TOOL] analyze_tool 분석 기록: {analysis[:200]}{'...' if len(analysis) > 200 else ''}")
     return f"Analysis recorded: {analysis}"
 
 
@@ -68,6 +72,11 @@ def submit_analysis_result(
         result_text += "\n\n**부족한 정보**:\n" + "\n".join(f"- {item}" for item in missing_items)
     if recommendations:
         result_text += "\n\n**권고 사항**:\n" + "\n".join(f"- {rec}" for rec in recommendations)
+
+    logger.info(f"[TOOL] submit_analysis_result: {sufficiency} | {analysis_summary[:100]}{'...' if len(analysis_summary) > 100 else ''}")
+    if missing_items:
+        logger.debug(f"부족한 항목: {missing_items}")
+
     return Command(
         update={"messages": [ToolMessage(result_text, tool_call_id=tool_call_id)]}
     )

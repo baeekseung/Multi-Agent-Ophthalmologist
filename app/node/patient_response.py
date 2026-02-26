@@ -1,6 +1,9 @@
 from langchain_core.messages import HumanMessage
 from langgraph.types import interrupt, Command
 from app.state import MainState
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 async def patient_response_node(state: MainState) -> Command:
     messages = state.get("messages", [])
@@ -20,9 +23,9 @@ async def patient_response_node(state: MainState) -> Command:
         user_input = input(prompt_message)
         if user_input and user_input.strip():
             break
+        logger.warning("빈 입력 수신 - 다시 입력 요청")
         print("빈 입력은 허용되지 않습니다. 다시 입력해주세요.")
 
-    # 입력 받은 값으로 HumanMessage 생성
     human_message = HumanMessage(content=user_input.strip(), name="patient")
-    print("\n")
+    logger.debug(f"[NODE] patient_response 수신: {user_input.strip()[:100]}")
     return Command(goto='consultation_agent', update={'messages': [human_message]})

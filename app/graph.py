@@ -19,7 +19,6 @@ from app.node.mid_level_analysis import (
     summarize_consensus_agent,
 )
 from app.node.diagnosis_agent import diagnosis_agent_node
-from app.node.generate_final_report import generate_final_report_node
 
 async def build_graph():
     init_db()  # 테이블이 없으면 생성
@@ -38,8 +37,6 @@ async def build_graph():
     workflow.add_node("summarize_consensus_agent", summarize_consensus_agent)
 
     workflow.add_node("diagnosis_agent", diagnosis_agent_node)
-    workflow.add_node("generate_final_report", generate_final_report_node)
-    workflow.add_node("end", END)
 
     workflow.set_entry_point("consultation_agent")
 

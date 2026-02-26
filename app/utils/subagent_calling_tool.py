@@ -8,6 +8,9 @@ from langgraph.types import Command
 from typing_extensions import TypedDict
 
 from app.state import DeepAgentState
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 TASK_DESCRIPTION_PREFIX = """Delegate a task to a specialized sub-agent with isolated context. Available agents for delegation are:
 {other_agents}
@@ -77,10 +80,14 @@ def _create_task_tool(tools, subagents: list[SubAgent], model, state_schema):
         """
         # 요청된 Sub-agent 타입이 레지스트리에 존재하는지 검증, 미존재 시 에러 반환
         if subagent_type not in agents:
+            logger.error(f"[TASK] 알 수 없는 서브에이전트: '{subagent_type}' (허용: {list(agents.keys())})")
             return f"Error: invoked agent of type {subagent_type}, the only allowed types are {[f'`{k}`' for k in agents]}"
 
         # 요청된 Sub-agent 인스턴스 가져오기
         sub_agent = agents[subagent_type]
+
+        logger.info(f"[TASK] → {subagent_type} 위임 시작")
+        logger.debug(f"[TASK] description: {description[:300]}{'...' if len(description) > 300 else ''}")
 
         # 작업 설명만 포함된 격리된 컨텍스트 생성, 부모 에이전트의 히스토리 미포함
         # HumanMessage 객체 사용 (일반 dict는 LangChain 메시지 검증 실패)
@@ -92,6 +99,9 @@ def _create_task_tool(tools, subagents: list[SubAgent], model, state_schema):
 
         # 격리된 환경에서 Sub-agent 실행 및 결과 획득
         result = sub_agent.invoke(new_state)
+
+        saved_files = list(result.get("files", {}).keys())
+        logger.info(f"[TASK] ← {subagent_type} 완료" + (f" | 저장된 파일: {saved_files}" if saved_files else ""))
 
         # 작업 결과를 Command 객체로 래핑하여 부모 에이전트에 ToolMessage 형태로 반환
         return Command(

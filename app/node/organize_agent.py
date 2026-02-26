@@ -7,7 +7,10 @@ from langchain_openai import ChatOpenAI
 from langgraph.types import Command
 from typing_extensions import Annotated
 
+from app.utils.logger import get_logger
 from app.prompts import ORGANIZE_AGENT_INSTRUCTIONS
+
+logger = get_logger(__name__)
 
 
 @tool(parse_docstring=True)
@@ -22,6 +25,7 @@ def synthesize_tool(synthesis: str) -> str:
     Returns:
         합성 과정이 기록되었음을 확인하는 메시지
     """
+    logger.debug(f"[TOOL] synthesize_tool 합성 기록: {synthesis[:200]}{'...' if len(synthesis) > 200 else ''}")
     return f"Synthesis recorded: {synthesis}"
 
 
@@ -52,6 +56,10 @@ def submit_organized_result(
         result_text += "\n\n**임상적 시사점**:\n" + "\n".join(f"- {c}" for c in clinical_implications)
 
     filename = f"{task_name}_result.md"
+
+    logger.info(f"[TOOL] submit_organized_result: '{filename}' 저장 | 요약: {result_summary[:100]}{'...' if len(result_summary) > 100 else ''}")
+    logger.debug(f"핵심 발견 사항: {key_findings}")
+
     return Command(
         update={
             "files": {filename: result_text},

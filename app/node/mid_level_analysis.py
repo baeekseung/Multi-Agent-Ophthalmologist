@@ -16,16 +16,19 @@ from app.prompts import (
     SUMMARIZE_CONSENSUS_PROMPT,
 )
 from app.utils.messages_pretty_print import messages_pretty_print
+from app.utils.logger import get_logger
 
 from functools import partial
+
+logger = get_logger(__name__)
 
 # 최대 반복 횟수
 MAX_RECONSULT_ROUNDS = 3
 
 async def create_expert_node(state: MainState, expert_name: str, model) -> Command:
-    print(f"AGENT CALLED: {expert_name} agent called")
     expert_messages = state.get(f"{expert_name}_messages", [])
-    print(f"## {expert_name} messages: {messages_pretty_print(expert_messages)}\n")
+    logger.info(f"[NODE] {expert_name} 에이전트 시작 (메시지 {len(expert_messages)}건)")
+    logger.debug(f"[NODE] {expert_name} 메시지:\n{messages_pretty_print(expert_messages)}")
     expert_agent = create_agent(
         model=model,
         tools=[],
@@ -53,7 +56,7 @@ EXPERT_NAMES = ["expert1", "expert2", "expert3"]
 
 async def evaluate_consensus_agent(state: MainState) -> Command:
     """전문의 의견을 평가하여 합의 여부를 판단."""
-    print(f"[AGENT CALLED]: evaluate_consensus called")
+    logger.info("[NODE] evaluate_consensus_agent 시작")
 
     expert_opinions = ""
     for name in EXPERT_NAMES:
@@ -61,7 +64,7 @@ async def evaluate_consensus_agent(state: MainState) -> Command:
         if messages:
             expert_opinions += f"[{name} Opinion]\n{messages[-1].content}\n\n"
 
-    print(f"## Expert opinions:\n{expert_opinions}\n")
+    logger.debug(f"전문의 의견:\n{expert_opinions}")
 
     llm = ChatOpenAI(model="gpt-4o", temperature=0)
     structured_llm = llm.with_structured_output(ConsensusDecision)
@@ -83,7 +86,7 @@ async def evaluate_consensus_agent(state: MainState) -> Command:
         f"결정 근거: {response.reasoning}\n"
     )
 
-    print(f"## Evaluate consensus result:\n{content}\n")
+    logger.info(f"[NODE] evaluate_consensus_agent 완료\n{content}")
 
     return Command(
         update={
@@ -93,7 +96,7 @@ async def evaluate_consensus_agent(state: MainState) -> Command:
     )
 
 async def summarize_consensus_agent(state: MainState) -> Command:
-    print(f"[AGENT CALLED]: Summarize consensus called")
+    logger.info("[NODE] summarize_consensus_agent 시작")
     supervisor_messages = state.get("supervisor_messages", [])
     consultation_summary = state.get("consultation_summary", "")
     consultation_turn = state.get("consultation_turn", 1)
@@ -125,8 +128,8 @@ async def summarize_consensus_agent(state: MainState) -> Command:
     chain = prompt | structured_llm
     response: FinalMidTermDiagnosisResult = await chain.ainvoke({"chat_history": chat_history})
 
-    print(f"## SUMMARIZE_CONSENSUS: Final diagnosis result:\n{response.diagnosis_result}")
-    print(f"## SUMMARIZE_CONSENSUS: Consultation sufficient: {response.consultation_sufficient}")
+    logger.info(f"[NODE] summarize_consensus_agent 완료 | 상담 충분: {response.consultation_sufficient}")
+    logger.debug(f"최종 진단 합의본:\n{response.diagnosis_result}")
 
     # supervisor_messages 초기화 (공통)
     # remove_supervisor_messages = [RemoveMessage(id=m.id) for m in state.get("supervisor_messages", [])]
@@ -166,17 +169,18 @@ async def summarize_consensus_agent(state: MainState) -> Command:
 MEMBERS = ["evaluate_consensus_agent", "summarize_consensus_agent"] + EXPERT_NAMES
 
 async def supervisor_agent_node(state: MainState) -> Command:
-    print(f"[AGENT CALLED]: Mid-level analysis supervisor agent called")
     round_number = state.get("round_number", 0)
     supervisor_messages = state.get("supervisor_messages", [])
-    print(messages_pretty_print(supervisor_messages))
     consultation_summary = state.get("consultation_summary", "")
     mid_term_diagnosis_summary = state.get("mid_term_diagnosis_summary", "")
     consultation_turn = state.get("consultation_turn", 1)
 
+    logger.info(f"[NODE] supervisor 시작 (라운드 {round_number}, 메시지 {len(supervisor_messages)}건)")
+    logger.debug(f"[NODE] supervisor 메시지:\n{messages_pretty_print(supervisor_messages)}")
+
     # 최대 재질의 횟수 초과 시 강제 종합
     if round_number >= MAX_RECONSULT_ROUNDS:
-        print(f"SUPERVISOR: Maximum reconsult rounds reached. Forcing consensus summary.\n")
+        logger.warning(f"[NODE] supervisor - 최대 재질의 횟수({MAX_RECONSULT_ROUNDS}) 도달. 강제 종합 실행")
         return Command(
             goto="summarize_consensus_agent",
             update={
@@ -196,15 +200,16 @@ async def supervisor_agent_node(state: MainState) -> Command:
     response = await agent.ainvoke({"messages": supervisor_messages})
     response_json = json.loads(response['messages'][-1].content)
 
-    print(f"## Supervisor response next_and_instruction:\n{response_json['next_and_instruction']}\n")
-
     # SupervisorResponse 파싱
     next_and_instruction = response_json['next_and_instruction']
     next_nodes = list(next_and_instruction.keys())
 
+    logger.info(f"[NODE] supervisor 결정 → {next_nodes}")
+    logger.debug(f"[NODE] supervisor 지시 내용:\n{response_json['next_and_instruction']}")
+
     # 여러 노드에 동시 요청 (fan-out, 주로 초기 라운드)
     if len(next_nodes) > 1:
-        print(f"## SUPERVISOR: Fan-out to multiple nodes: {next_nodes}\n")
+        logger.info(f"[NODE] supervisor fan-out → {next_nodes}")
         sends = []
         supervisor_update_messages_content = ""
 

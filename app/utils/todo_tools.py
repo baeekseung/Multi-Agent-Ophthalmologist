@@ -6,6 +6,9 @@ from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
 from app.state import DeepAgentState, Todo
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 @tool(parse_docstring=True)
@@ -24,6 +27,8 @@ def write_todos(
     """
     summary_lines = [f"- [{item['status']}] {item['content']}" for item in todos]
     summary_text = "TODO 목록이 업데이트되었습니다:\n" + "\n".join(summary_lines)
+
+    logger.info(f"[TODO] 업데이트\n{chr(10).join(summary_lines)}")
 
     return Command(
         update={
