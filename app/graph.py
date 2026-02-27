@@ -19,9 +19,14 @@ from app.node.mid_level_analysis import (
     summarize_consensus_agent,
 )
 from app.node.diagnosis_agent import diagnosis_agent_node
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 async def build_graph():
-    init_db()  # 테이블이 없으면 생성
+    logger.info("[GRAPH] 그래프 빌드 시작")
+    init_db()
+    logger.info("[GRAPH] DB 초기화 완료")
     workflow = StateGraph(MainState)
 
     workflow.add_node("patient_response", patient_response_node)
@@ -41,4 +46,5 @@ async def build_graph():
     workflow.set_entry_point("consultation_agent")
 
     graph = workflow.compile(checkpointer=MemorySaver())
+    logger.info("[GRAPH] 그래프 빌드 완료 (노드 수: %d)", len(workflow.nodes))
     return graph

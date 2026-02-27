@@ -76,6 +76,7 @@ class MainState(AgentState):
     mid_term_diagnosis_summary: NotRequired[str]
     expert_responses_received: NotRequired[int]
     expert_responses_expected: NotRequired[int]
+    previous_records: NotRequired[str]  # 이전 진료기록 조회 결과
     diagnosis_research_result: NotRequired[str]  # diagnosis_agent가 생성한 심층 연구 결과
     final_report: NotRequired[str]  # generate_final_report 노드가 생성하는 최종 진단서
 

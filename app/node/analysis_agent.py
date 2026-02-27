@@ -21,7 +21,9 @@ def read_collected_files(
 ) -> str:
     files = state.get("files", {})
     if not files:
+        logger.debug("[TOOL] read_collected_files: 수집된 파일 없음")
         return "수집된 파일이 없습니다. task description에 포함된 검색 결과를 분석하세요."
+    logger.debug(f"[TOOL] read_collected_files: {len(files)}개 파일 읽기 - {list(files.keys())}")
     result_parts = [f"총 {len(files)}개 파일:\n"]
     for filename, content in files.items():
         result_parts.append(f"=== [{filename}] ===\n{content}\n")

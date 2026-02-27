@@ -6,6 +6,7 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
 async def patient_response_node(state: MainState) -> Command:
+    logger.info("[NODE] patient_response 시작")
     messages = state.get("messages", [])
     last_message = messages[-1] if messages else None   # 마지막 메시지(AI Message) 가져오기
 
@@ -27,5 +28,6 @@ async def patient_response_node(state: MainState) -> Command:
         print("빈 입력은 허용되지 않습니다. 다시 입력해주세요.")
 
     human_message = HumanMessage(content=user_input.strip(), name="patient")
-    logger.debug(f"[NODE] patient_response 수신: {user_input.strip()[:100]}")
+    logger.info(f"[NODE] patient_response 수신: {user_input.strip()[:100]}")
+    logger.info("[NODE] patient_response 완료 → consultation_agent")
     return Command(goto='consultation_agent', update={'messages': [human_message]})

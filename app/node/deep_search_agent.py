@@ -146,6 +146,7 @@ def think_tool(reflection: str) -> str:
 
     Returns:
         Confirmation that reflection was recorded for decision-making"""
+    logger.debug(f"[TOOL] think_tool 호출: {reflection[:200]}{'...' if len(reflection) > 200 else ''}")
     return f"Reflection recorded: {reflection}"
 
 model = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)

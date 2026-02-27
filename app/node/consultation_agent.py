@@ -4,6 +4,8 @@ from typing import Annotated
 
 from app.prompts import UPDATE_QUESTIONS_TOOL_DESCRIPTION, CONSULTATION_AGENT_PROMPT
 from app.state import Question, MainState
+from app.database.connection import SessionLocal
+from app.database.models import PatientRecord
 from app.utils.messages_pretty_print import messages_pretty_print
 from app.utils.logger import get_logger
 
@@ -40,9 +42,58 @@ def update_questions(questions: list[Question], tool_call_id: Annotated[str, Inj
             "messages": [ToolMessage(content=f"Updated question list to {questions}", tool_call_id=tool_call_id)]})
 
 
+@tool(parse_docstring=True)
+def search_previous_records(
+    patient_name: str,
+    patient_age: int,
+    patient_gender: str,
+    tool_call_id: Annotated[str, InjectedToolCallId],
+) -> Command:
+    """환자의 이전 진료기록을 PostgreSQL에서 검색합니다.
+    인적사항(이름, 나이, 성별) 수집 완료 후 반드시 호출하세요.
+
+    Args:
+        patient_name: 환자 이름
+        patient_age: 환자 나이
+        patient_gender: 환자 성별 (남성/여성)
+    """
+    logger.info(f"[TOOL] search_previous_records 호출 - {patient_name}, {patient_age}세, {patient_gender}")
+
+    session = SessionLocal()
+    try:
+        records = session.query(PatientRecord).filter(
+            PatientRecord.patient_name.ilike(f"%{patient_name}%"),
+            PatientRecord.patient_age == patient_age,
+            PatientRecord.patient_gender == patient_gender,
+        ).order_by(PatientRecord.created_at.desc()).all()
+
+        if not records:
+            formatted_result = "이전 진료기록이 없습니다."
+            logger.info(f"[TOOL] search_previous_records - 이전 기록 없음")
+        else:
+            formatted_result = f"## 이전 진료기록 ({len(records)}건)\n\n"
+            for i, record in enumerate(records, 1):
+                created_at = record.created_at.strftime("%Y-%m-%d %H:%M") if record.created_at else "날짜 미상"
+                formatted_result += f"### 기록 {i} ({created_at})\n"
+                formatted_result += f"**진료상담 요약:**\n{record.consultation_summary}\n\n"
+                formatted_result += f"**최종 진단서:**\n{record.final_report}\n\n"
+                formatted_result += "---\n\n"
+            logger.info(f"[TOOL] search_previous_records - {len(records)}건 조회됨")
+    except Exception as e:
+        logger.error(f"[TOOL] search_previous_records 오류: {e}")
+        formatted_result = "이전 진료기록 조회 중 오류가 발생했습니다."
+    finally:
+        session.close()
+
+    return Command(update={
+        "previous_records": formatted_result,
+        "messages": [ToolMessage(content=formatted_result, tool_call_id=tool_call_id)],
+    })
+
+
 consultation_agent = create_agent(
     model=ChatOpenAI(model="gpt-4o", temperature=0.1),
-    tools=[update_questions],
+    tools=[update_questions, search_previous_records],
     system_prompt=CONSULTATION_AGENT_PROMPT,
     state_schema=MainState)
 
