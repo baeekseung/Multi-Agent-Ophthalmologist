@@ -86,19 +86,30 @@ def submit_report(
     )
 
 
-@tool()
+@tool(parse_docstring=True)
 def save_report_file(
+    patient_name: str,
+    patient_age: int,
+    patient_gender: str,
     state: Annotated[DeepAgentState, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    """로컬 파일시스템에 완성된 진단 보고서를 .md 파일로 저장합니다.
+    """로컬 파일시스템에 완성된 진단 보고서를 .md 파일로 저장하고 PostgreSQL에 환자 기록을 저장합니다.
 
     submit_report 도구 호출 후 반드시 이 도구를 호출하여
     보고서를 실제 파일로 저장하세요.
+    보고서의 "환자 개요" 섹션에서 환자 인적정보를 파싱하여 전달해야 합니다.
+
+    Args:
+        patient_name: 환자 이름 (보고서 환자 개요에서 파싱)
+        patient_age: 환자 나이 (보고서 환자 개요에서 파싱)
+        patient_gender: 환자 성별 (보고서 환자 개요에서 파싱, 예: 남성/여성)
+
+    Returns:
+        로컬 파일 저장 및 DB 저장 결과를 반환하는 Command
     """
     content = state.get("files", {}).get("diagnosis_report.md", "")
     if not content:
-        # submit_report가 먼저 호출되지 않은 경우
         logger.warning("[TOOL] save_report_file: diagnosis_report.md가 아직 없습니다. submit_report를 먼저 호출하세요.")
         return Command(
             update={"messages": [ToolMessage(
@@ -107,6 +118,7 @@ def save_report_file(
             )]}
         )
 
+    # 1. 로컬 파일 저장
     save_dir = "reports"
     os.makedirs(save_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -116,9 +128,39 @@ def save_report_file(
         f.write(content)
 
     logger.info(f"[TOOL] save_report_file: 보고서 저장 완료 → {file_path} ({len(content)}자)")
+
+    # 2. PostgreSQL PatientRecord 저장
+    consultation_summary = state.get("files", {}).get("consultation_summary.txt", "")
+    if not consultation_summary:
+        consultation_summary = "상담 요약 정보 없음"
+        logger.warning("[TOOL] save_report_file: consultation_summary.txt가 files에 없습니다.")
+
+    try:
+        from app.database.connection import SessionLocal
+        from app.database.models import PatientRecord
+
+        db = SessionLocal()
+        record = PatientRecord(
+            patient_name=patient_name,
+            patient_age=patient_age,
+            patient_gender=patient_gender,
+            consultation_summary=consultation_summary,
+            final_report=content,
+        )
+        db.add(record)
+        db.commit()
+        record_id = record.id
+        db.close()
+
+        logger.info(f"[TOOL] save_report_file: DB 저장 완료 → PatientRecord(id={record_id})")
+        db_msg = f", DB 저장 완료 (PatientRecord id={record_id})"
+    except Exception as e:
+        logger.error(f"[TOOL] save_report_file: DB 저장 실패 → {e}")
+        db_msg = f", DB 저장 실패: {e}"
+
     return Command(
         update={"messages": [ToolMessage(
-            f"보고서가 저장되었습니다: {file_path}",
+            f"보고서가 저장되었습니다: {file_path}{db_msg}",
             tool_call_id=tool_call_id,
         )]}
     )

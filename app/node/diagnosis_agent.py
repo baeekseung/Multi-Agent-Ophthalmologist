@@ -62,6 +62,7 @@ async def diagnosis_agent_node(state: MainState) -> Command:
 
     result = await agent.ainvoke({
         "messages": [HumanMessage(content=initial_message)],
+        "files": {"consultation_summary.txt": consultation_summary},
     })
 
     final_report = result["messages"][-1].content
