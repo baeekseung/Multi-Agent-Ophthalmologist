@@ -129,14 +129,11 @@ def think_tool(reflection: str) -> str:
     """Tool for strategic reflection on research progress and decision-making.
 
     Use this tool after each search to analyze results and plan next steps systematically.
-    This creates a deliberate pause in the research workflow for quality decision-making.
 
     When to use:
     - After receiving search results: What key information did I find?
     - Before deciding next steps: Do I have enough to answer comprehensively?
-    - When assessing research gaps: What specific information am I still missing?
     - Before concluding research: Can I provide a complete answer now?
-    - How complex is the question: Have I reached the number of search limits?
 
     Reflection should address:
     1. Analysis of current findings - What concrete information have I gathered?
@@ -156,7 +153,7 @@ model = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
 deep_search_agent_tools = [tavily_search, think_tool]
 deep_search_agent = {
     "name": "deep-search-agent",
-    "description": "Delegate research to the sub-agent researcher. Only give this researcher one topic at a time.",
+    "description": "Delegate medical research to the sub-agent medical researcher. Only give this researcher one topic at a time.",
     "prompt": MEDICAL_RESEARCHER_INSTRUCTIONS,
     "tools": ["tavily_search", "think_tool"],
 }

@@ -100,10 +100,13 @@ async def summarize_consensus_agent(state: MainState) -> Command:
     supervisor_messages = state.get("supervisor_messages", [])
     consultation_summary = state.get("consultation_summary", "")
     consultation_turn = state.get("consultation_turn", 1)
+    # 현재 중간분석 턴의 시작 인덱스 (없으면 0 - 첫 번째 턴)
+    turn_start = state.get("supervisor_messages_turn_start", 0)
+    current_turn_messages = supervisor_messages[turn_start:]
 
-    # supervisor_messages에서 전문의 의견과 supervisor 지시사항 추출
+    # 현재 턴에 해당하는 메시지만 추출
     chat_history = ""
-    for m in supervisor_messages:
+    for m in current_turn_messages:
         if m.name == "expert1":
             chat_history += f"[expert1 opinion]\n{m.content}\n\n"
         elif m.name == "expert2":
@@ -153,11 +156,14 @@ async def summarize_consensus_agent(state: MainState) -> Command:
         # remove_expert1 = [RemoveMessage(id=m.id) for m in state.get("expert1_messages", [])]
         # remove_expert2 = [RemoveMessage(id=m.id) for m in state.get("expert2_messages", [])]
         # remove_expert3 = [RemoveMessage(id=m.id) for m in state.get("expert3_messages", [])]
+        # 다음 턴의 시작 인덱스: 현재 길이 + 1 (지금 추가될 HumanMessage 포함)
+        next_turn_start = len(supervisor_messages) + 1
         return Command(
             update={
                 "mid_term_diagnosis_summary": response.diagnosis_result,
                 "messages": [HumanMessage(content=expert_opinion_message, name="expert")],
                 "supervisor_messages": [HumanMessage(content=f"{consultation_turn}번째 Mid-level analysis 결과: {response.diagnosis_result}\n\n추가적으로 요청하신 질문에 대해 답변을 받아 다시 Mid-level analysis를 진행합니다.", name="summarize_consensus_agent")],
+                "supervisor_messages_turn_start": next_turn_start,
                 "consultation_turn": consultation_turn + 1,
                 # "expert1_messages": remove_expert1,
                 # "expert2_messages": remove_expert2,

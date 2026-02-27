@@ -73,10 +73,15 @@ def _create_task_tool(tools, subagents: list[SubAgent], model, state_schema):
         state: Annotated[DeepAgentState, InjectedState],
         tool_call_id: Annotated[str, InjectedToolCallId],
     ):
-        """Delegate a task to a specialized sub-agent with isolated context.
+        """특정 작업을 전문화된 서브 에이전트에게 위임하여 실행하는 도구. 위임할 서브에이전트의 이름과 작업 설명을 제공하면 해당 서브에이전트가 작업을 수행하고 결과를 반환합니다.
+        서브 에이전트가 작업을 수행하고 결과를 반환하면, 그 결과를 부모 에이전트에 ToolMessage 형태로 반환합니다.
 
-        This creates a fresh context for the sub-agent containing only the task description,
-        preventing context pollution from the parent agent's conversation history.
+        Args:
+            description: 작업 설명(명확하고 구체적인 작업 내용을 포함하는 문자열)
+            subagent_type: 위임할 서브에이전트의 이름(레지스트리에 등록된 서브에이전트의 이름)
+
+        Returns:
+            Command: 작업 결과를 포함한 상태 업데이트 명령
         """
         # 요청된 Sub-agent 타입이 레지스트리에 존재하는지 검증, 미존재 시 에러 반환
         if subagent_type not in agents:

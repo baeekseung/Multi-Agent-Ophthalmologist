@@ -1,7 +1,8 @@
 """
 로깅 유틸리티 모듈
 - INFO 이상: 터미널 출력 (ANSI 컬러)
-- DEBUG 이상: 파일 기록 (logs/ophtimus.log, 로테이션)
+- DEBUG 이상: 파일 기록 (logs/{thread_id}.log, 로테이션)
+- setup_logging(thread_id) 호출로 세션별 로그 파일 분리 가능
 """
 import logging
 import sys
@@ -10,7 +11,6 @@ from pathlib import Path
 
 # 프로젝트 루트 기준 logs/ 디렉터리
 _LOG_DIR = Path(__file__).parent.parent.parent / "logs"
-_LOG_FILE = _LOG_DIR / "ophtimus.log"
 
 # ANSI 컬러 코드
 _COLORS = {
@@ -35,6 +35,54 @@ class _ColorFormatter(logging.Formatter):
         formatted = super().format(record)
         record.levelname = original_levelname
         return formatted
+
+
+def _create_file_handler(log_path: Path) -> RotatingFileHandler:
+    """RotatingFileHandler 인스턴스를 생성하여 반환한다."""
+    _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    handler = RotatingFileHandler(
+        log_path,
+        maxBytes=10 * 1024 * 1024,  # 10 MB
+        backupCount=5,
+        encoding="utf-8",
+    )
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s [%(levelname)-8s] %(name)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    return handler
+
+
+# 모든 logger가 공유하는 파일 핸들러 (초기값: ophtimus.log)
+_file_handler: RotatingFileHandler = _create_file_handler(_LOG_DIR / "ophtimus.log")
+
+
+def setup_logging(thread_id: str) -> None:
+    """thread_id 기반으로 로그 파일을 전환한다.
+
+    main() 함수 최상단에서 app 모듈 import 전에 호출해야 한다.
+    이미 등록된 logger가 있을 경우에도 핸들러를 일괄 교체한다.
+
+    Args:
+        thread_id: 로그 파일명으로 사용할 스레드 ID (예: 'thread2' → logs/thread2.log)
+    """
+    global _file_handler
+
+    new_log_path = _LOG_DIR / f"{thread_id}.log"
+    new_handler = _create_file_handler(new_log_path)
+    old_handler = _file_handler
+
+    # 기존에 등록된 모든 logger의 핸들러를 교체 (방어적 처리)
+    for logger_obj in logging.Logger.manager.loggerDict.values():
+        if isinstance(logger_obj, logging.Logger) and old_handler in logger_obj.handlers:
+            logger_obj.removeHandler(old_handler)
+            logger_obj.addHandler(new_handler)
+
+    old_handler.close()
+    _file_handler = new_handler
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -67,22 +115,7 @@ def get_logger(name: str) -> logging.Logger:
         )
     )
 
-    # ── 파일 핸들러 (DEBUG 이상, 로테이션) ──────────────────────────────────
-    _LOG_DIR.mkdir(parents=True, exist_ok=True)
-    file_handler = RotatingFileHandler(
-        _LOG_FILE,
-        maxBytes=10 * 1024 * 1024,  # 10 MB
-        backupCount=5,
-        encoding="utf-8",
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(
-        logging.Formatter(
-            fmt="%(asctime)s [%(levelname)-8s] %(name)s | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-    )
-
+    # ── 파일 핸들러: 공유 인스턴스 참조 (setup_logging으로 교체 가능) ────────
     logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
+    logger.addHandler(_file_handler)
     return logger

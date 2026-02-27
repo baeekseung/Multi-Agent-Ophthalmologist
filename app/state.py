@@ -36,13 +36,11 @@ class ConsensusDecision(BaseModel):
 
 class FinalMidTermDiagnosisResult(BaseModel):
     diagnosis_result: str = Field(
-        description="The final diagnosis result when consensus is reached, based on the expert opinions and consultation summary. Be sure to include: 1) a clear summary of the experts' opinions and their reasoning, 2) a detailed explanation of any additional information requested by the experts, specifying exactly what should be further asked of the patient and why, and 3) Whether additional analysis is required after collecting supplementary information.")
+        description="supervisor와 expert들의 대화에서 합의된 분석내용을 한국어로 작성합니다. 분석에서 결정된 환자의 예상질병, 그에 대한 근거를 명확하게 작성합니다. 만약  expert들이 요청한 추가 정보가 존재한다면 내용에 포함시켜 작성합니다.")
     consultation_sufficient: bool = Field(
-        description="""진료상담 종료 여부 판단.
-        True: 모든 전문의의 required_information이 None이고, 예상 질병이 1~2개로 명확하며,
-              환자 기본정보(나이/성별/증상/과거력)가 모두 수집된 경우.
-        False: 하나 이상의 전문의가 required_information을 제시하거나,
-               감별 진단이 필요하거나, 핵심 정보가 누락된 경우. 불확실하면 False."""
+        description="""전문의들이 추가로 요청한 정보존재 여부를 기반으로 진료상담을 종료할지 여부를 결정합니다.
+        True: 모든 전문의의 마지막 의견에서 required_information이 None인 경우
+        False: 하나 이상의 전문의가 required_information을 제시한 경우"""
     )
 
 
@@ -69,6 +67,7 @@ class MainState(AgentState):
     consultation_turn: NotRequired[int] = 1
 
     supervisor_messages: Annotated[list[AnyMessage], add_messages]
+    supervisor_messages_turn_start: NotRequired[int]  # 현재 중간분석 턴의 시작 인덱스 (기본값 0)
     expert1_messages: Annotated[list[AnyMessage], add_messages]
     expert2_messages: Annotated[list[AnyMessage], add_messages]
     expert3_messages: Annotated[list[AnyMessage], add_messages]

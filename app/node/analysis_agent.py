@@ -30,12 +30,12 @@ def read_collected_files(
 
 @tool(parse_docstring=True)
 def analyze_tool(analysis: str) -> str:
-    """수집된 정보의 충분성을 분석하고 판단 근거를 기록합니다.
+    """현재 진행중인 sub task에 대한 정보의 충분성을 분석하고 판단 근거를 기록합니다.
 
     각 분석 단계에서 반드시 사용하여 구조적 사고를 기록합니다.
 
     Args:
-        analysis: 현재 TODO 요구사항 vs 수집 정보 비교 분석 내용
+        analysis: 현재 sub task 요구사항 vs 수집 정보 비교 분석 내용
 
     Returns:
         분석 내용이 기록되었음을 확인하는 메시지
@@ -88,7 +88,7 @@ analysis_agent_tools = [read_collected_files, analyze_tool, submit_analysis_resu
 
 analysis_agent = {
     "name": "information-analysis-agent",
-    "description": "수집된 의료 연구 정보가 현재 진행 중인 TODO 작업을 완료하기에 충분한지 분석합니다. deep_search_agent 검색 후 충분성 확인이 필요할 때 호출하세요.",
+    "description": "수집된 의료 연구 정보가 현재 진행 중인 sub task를 완료하기에 충분한지 분석합니다. deep_search_agent 검색 후 충분성 확인이 필요할 때 호출하세요.",
     "prompt": ANALYSIS_AGENT_INSTRUCTIONS,
     "tools": ["read_collected_files", "analyze_tool", "submit_analysis_result"],
 }
