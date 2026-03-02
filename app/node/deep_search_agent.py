@@ -32,6 +32,7 @@ class Summary(BaseModel):
     summary: str = Field(description="Key learnings from the webpage.")
 
 summarization_model = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+
 def summarize_webpage_contents(search_query: str, webpage_contents: list[str]) -> list[Summary]:
     if not webpage_contents:
         return []
@@ -75,7 +76,7 @@ def process_search_results(query: str, results: dict) -> list[dict]:
                 "url": result["url"],
                 "title": result["title"],
                 "summary": summary_obj.summary,
-                "raw_content": result.get("raw_content", ""),
+                # "raw_content": result.get("raw_content", ""),
             }
         )
 
