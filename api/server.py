@@ -3,6 +3,8 @@ from typing import Optional
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
@@ -23,14 +25,6 @@ sessions = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    FastAPI 앱 시작 시: 그래프 빌드
-    FastAPI 앱 종료 시: 정리 작업
-
-    @asynccontextmanager 데코레이터:
-    - yield 이전 코드 → 앱 시작 시 실행
-    - yield 이후 코드 → 앱 종료 시 실행
-    """
     global graph, checkpointer
 
     # 앱 시작 시: LangGraph 그래프 빌드
@@ -55,17 +49,25 @@ app = FastAPI(
     lifespan=lifespan,  # 라이프사이클 함수 등록
 )
 
+# CORS 설정: 프론트엔드(브라우저)에서 API 호출 허용
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 개발 환경: 모든 오리진 허용
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Static 파일 서빙: /static 경로에서 static/ 폴더 제공
+import os
+static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
 
 # Pydantic 스키마 (요청/응답 데이터 모델)
 # Pydantic: 데이터 검증 라이브러리. BaseModel을 상속받아 정의
 # FastAPI가 요청 Body를 자동으로 파싱하고 Swagger 문서를 생성해줌
-
-class SessionCreateRequest(BaseModel):
-    """POST /sessions 요청 Body - 환자 기본 정보"""
-    patient_name: str = "백승주"
-    patient_age: int = 29
-    patient_gender: str = "남자"
-
 
 class SessionResponse(BaseModel):
     """POST /sessions 응답 - 세션 ID + 첫 번째 AI 질문"""
@@ -113,19 +115,30 @@ def extract_question(result: dict) -> Optional[str]:
 @app.get("/")
 async def root_function():
     return {
-        "status": "ok",
-        "graph_ready": graph is not None,
-        "active_sessions": len(sessions),
+        "service": {
+            "name": "AGENTIC OPHTIMUS",
+            "description": "AI 기반 안과 진료 보조 서비스입니다. AI 에이전트가 환자와 대화를 통해 증상을 수집하고, 전문의 수준의 진단 보고서를 생성합니다.",
+            "version": "1.0.0",
+        },
+        "how_to_use": [
+            "1. POST /sessions — 진료 세션을 시작합니다.",
+            "2. POST /sessions/{session_id}/answer — AI의 질문에 답변을 제출합니다. (여러 번 반복)",
+            "3. GET /sessions/{session_id}/report — 진단이 완료되면 최종 보고서를 조회합니다.",
+        ],
+        "caution": [
+            "본 서비스는 의료 보조 AI이며, 공식적인 의학적 진단을 대체하지 않습니다.",
+            "생성된 진단 보고서는 참고 자료로만 활용하고, 반드시 전문 의료진과 상담하시기 바랍니다.",
+            "개인 건강 정보는 세션 종료 후 별도로 저장되지 않습니다.",
+        ],
+        "links": {
+            "api_docs": "/docs",
+            "health_check": "/health",
+        },
     }
 
 # 엔드포인트 정의
 @app.get("/health")
 async def health_check():
-    """
-    [GET /health] 서버 상태 확인
-
-    서버가 정상 작동 중인지, 그래프가 준비되었는지 확인합니다.
-    """
     return {
         "status": "ok",
         "graph_ready": graph is not None,
@@ -134,7 +147,7 @@ async def health_check():
 
 
 @app.post("/sessions", response_model=SessionResponse)
-async def start_consiltation(request: SessionCreateRequest):
+async def start_consiltation():
     """
     [POST /sessions] 새 진료 세션 생성
 
@@ -175,14 +188,10 @@ async def start_consiltation(request: SessionCreateRequest):
         sessions[session_id] = {
             "session_id": session_id,
             "status": "patient response waiting",   # 답변 대기 중
-            "current_question": question,   # 현재 AI 질문
-            "final_report": None,           # 아직 보고서 없음
-            "graph_config": config,         # 그래프 재개에 필요한 설정
-            "patient_info": {
-                "name": request.patient_name,
-                "age": request.patient_age,
-                "gender": request.patient_gender,
-            },
+            "current_question": question,           # 현재 AI 질문
+            "final_report": None,                   # 아직 보고서 없음
+            "graph_config": config,                 # 그래프 재개에 필요한 설정
+            "patient_info": {},                     # 에이전트가 대화하며 수집
         }
 
         return SessionResponse(
