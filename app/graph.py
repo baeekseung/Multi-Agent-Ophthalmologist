@@ -23,7 +23,13 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-async def build_graph():
+async def build_graph(checkpointer=None):
+    """
+    LangGraph 워크플로우 빌드 및 컴파일
+
+    Args:
+        checkpointer: 체크포인터 인스턴스 (None이면 MemorySaver 사용)
+    """
     logger.info("[GRAPH] 그래프 빌드 시작")
     init_db()
     logger.info("[GRAPH] DB 초기화 완료")
@@ -45,6 +51,8 @@ async def build_graph():
 
     workflow.set_entry_point("consultation_agent")
 
-    graph = workflow.compile(checkpointer=MemorySaver())
+    # 외부에서 checkpointer를 주입받지 않으면 MemorySaver 사용 (CLI 호환)
+    _checkpointer = checkpointer if checkpointer is not None else MemorySaver()
+    graph = workflow.compile(checkpointer=_checkpointer)
     logger.info("[GRAPH] 그래프 빌드 완료 (노드 수: %d)", len(workflow.nodes))
     return graph

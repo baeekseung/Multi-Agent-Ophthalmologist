@@ -17,15 +17,12 @@ async def patient_response_node(state: MainState) -> Command:
         prompt_message = "이전 대화 내역이 없습니다. 시스템을 다시 시작해주세요."
 
     # interrupt를 통한 사용자 입력 대기
-    # 그래프 실행이 일시 중지되고 외부에서 입력을 받을 때까지 대기
-    # user_input = interrupt(prompt_message)
-    
-    while True:
-        user_input = input(prompt_message)
-        if user_input and user_input.strip():
-            break
-        logger.warning("빈 입력 수신 - 다시 입력 요청")
-        print("빈 입력은 허용되지 않습니다. 다시 입력해주세요.")
+    # 그래프 실행이 일시 중지되고 외부(API)에서 Command(resume=...) 를 받을 때까지 대기
+    user_input = interrupt({"question": last_message.content if last_message else prompt_message})
+
+    # API에서 dict 형태로 넘어올 수 있음 (예: {"answer": "..."})
+    if isinstance(user_input, dict):
+        user_input = user_input.get("answer", str(user_input))
 
     human_message = HumanMessage(content=user_input.strip(), name="patient")
     logger.info(f"[NODE] patient_response 수신: {user_input.strip()[:100]}")

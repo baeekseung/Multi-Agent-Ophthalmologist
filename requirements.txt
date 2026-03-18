@@ -3,6 +3,8 @@ langchain
 langchain-openai
 langgraph
 langchain-core
+langchain-tavily
+langchain-community
 
 # 환경 변수
 python-dotenv
@@ -10,6 +12,11 @@ python-dotenv
 # 데이터베이스
 sqlalchemy
 psycopg2-binary
+
+# 웹 서버
+fastapi
+uvicorn[standard]
+websockets
 
 # 기타 의존성
 typing-extensions
