@@ -75,9 +75,10 @@ def _sse_heartbeat() -> str:
 def _extract_detail(node_name: str, updates: dict) -> Optional[str]:
     """노드 업데이트에서 진행 상세 정보 추출"""
     if node_name == "supervisor":
-        # 실제 state 필드명: round_number
+        # round_number=1은 첫 fan-out 결과 → 재질의 아님
+        # round_number>=2 부터가 실제 재질의
         round_num = updates.get("round_number")
-        if round_num is not None:
+        if round_num is not None and round_num >= 2:
             return f"라운드 {round_num} — 전문의 재질의 진행 중"
         return None
 
@@ -176,16 +177,14 @@ def _extract_rich_content(node_name: str, updates: dict) -> Optional[str]:
         msgs = updates.get("supervisor_messages") or []
         round_num = updates.get("round_number")
         lines = []
-        if round_num is not None:
-            lines.append(f"현재 분석 라운드: {round_num}차")
+        # round_number=1은 첫 fan-out, >=2부터 재질의
+        if round_num is not None and round_num >= 2:
+            lines.append(f"분석 라운드\n{round_num}차 (재질의)")
         if msgs:
             raw = getattr(msgs[-1], "content", "") or ""
-            # "[Supervisor -> xxx]\n내용" 형태에서 내용만 추출
-            if raw.startswith("[Supervisor"):
-                bracket_end = raw.find("]")
-                raw = raw[bracket_end + 1:].strip() if bracket_end != -1 else raw
+            # 내용 전체를 그대로 표시 (각 전문의 지시사항 레이블 포함)
             if raw:
-                lines.append(raw)
+                lines.append(f"전문의 지시사항\n{raw}")
         return "\n\n".join(lines) if lines else None
 
     elif node_name == "evaluate_consensus_agent":
@@ -239,14 +238,11 @@ def _chunk_to_sse_events(mode: str, chunk: dict) -> list[str]:
             updates = updates or {}
             detail = _extract_detail(node_name, updates)
 
-            # supervisor/expert 노드는 round_number로 타이틀에 라운드 표기
+            # supervisor: round_number>=2 일 때만 "(라운드 X 재질의)" 표기
             title = meta["title"]
             round_num = updates.get("round_number")
-            if node_name == "supervisor" and round_num:
-                title = f"슈퍼바이저 분석 조율 (라운드 {round_num})"
-            elif node_name in ("expert1", "expert2", "expert3"):
-                # expert 메시지의 라운드 힌트는 supervisor_messages 길이로 간접 추정
-                pass
+            if node_name == "supervisor" and round_num is not None and round_num >= 2:
+                title = f"슈퍼바이저 분석 조율 (라운드 {round_num} 재질의)"
 
             rich = _extract_rich_content(node_name, updates)
             payload = {
