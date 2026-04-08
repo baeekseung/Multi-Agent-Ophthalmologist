@@ -19,7 +19,7 @@ class AnswerResponse(BaseModel):
     """POST /sessions/{id}/answer 응답 - 다음 질문 or 완료"""
     session_id: str
     question: Optional[str] = None   # 다음 질문 (완료 시 None)
-    status: str                      # "waiting" | "completed"
+    status: str                      # "waiting" | "completed" | "analyzing"
     message: Optional[str] = None    # 완료 시 안내 메시지
 
 

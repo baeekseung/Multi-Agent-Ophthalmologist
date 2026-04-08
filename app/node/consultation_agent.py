@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 load_dotenv()
-from typing import Annotated
+from typing import Annotated, Literal
 
 from app.prompts import UPDATE_QUESTIONS_TOOL_DESCRIPTION, CONSULTATION_AGENT_PROMPT
 from app.state import Question, MainState
@@ -46,7 +46,7 @@ def update_questions(questions: list[Question], tool_call_id: Annotated[str, Inj
 def search_previous_records(
     patient_name: str,
     patient_age: int,
-    patient_gender: str,
+    patient_gender: Literal["남성", "여성"],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
     """환자의 이전 진료기록을 PostgreSQL에서 검색합니다.
@@ -55,7 +55,7 @@ def search_previous_records(
     Args:
         patient_name: 환자 이름
         patient_age: 환자 나이
-        patient_gender: 환자 성별 (남성/여성)
+        patient_gender: 환자 성별
     """
     logger.info(f"[TOOL] search_previous_records 호출 - {patient_name}, {patient_age}세, {patient_gender}")
 

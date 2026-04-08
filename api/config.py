@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 1
 
     # LLM 응답 타임아웃 (초 단위, 기본 120초)
-    llm_timeout_seconds: int = 120
+    llm_timeout_seconds: int = 300
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
