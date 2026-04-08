@@ -11,7 +11,7 @@ from app.utils.logger import get_logger
 
 from langchain.agents import create_agent
 from langchain_core.tools import InjectedToolCallId, tool
-from langchain_core.messages import AIMessage, ToolMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, ToolMessage, HumanMessage
 from langgraph.types import Command
 from langchain_openai import ChatOpenAI
 
@@ -35,8 +35,14 @@ def update_questions(questions: list[Question], tool_call_id: Annotated[str, Inj
     all_completed = all(q["status"] == "completed" for q in questions)
     if all_completed:
         logger.info("[TOOL] update_questions - 모든 질문 완료")
+        # 완료 마커를 ToolMessage content에 포함 (SystemMessage를 끼워넣으면
+        # 두 도구가 동시 호출될 때 ToolMessage 사이에 role이 섞여 OpenAI 400 에러 발생)
         return Command(update={
-            "messages": [ToolMessage(content=f"Updated question list to {questions}", tool_call_id=tool_call_id), SystemMessage(content="모든 질문이 완료되었습니다.", name="expert")]})
+            "messages": [ToolMessage(
+                content=f"Updated question list to {questions}\n[STATUS: ALL_QUESTIONS_COMPLETED]",
+                tool_call_id=tool_call_id,
+            )]
+        })
     else:
         return Command(update={
             "messages": [ToolMessage(content=f"Updated question list to {questions}", tool_call_id=tool_call_id)]})
@@ -104,9 +110,10 @@ async def consultation_agent_node(state: MainState) -> Command:
 
     response = await consultation_agent.ainvoke({"messages": messages})
 
-    # SystemMessage 기반으로 완료 여부 확인 (LLM이 consultation_next를 덮어쓸 수 있으므로)
+    # ToolMessage의 완료 마커로 완료 여부 확인
+    # (SystemMessage를 messages에 삽입하면 동시 tool call 시 OpenAI 400 에러 발생)
     completion_triggered = any(
-        isinstance(m, SystemMessage) and "모든 질문이 완료" in m.content
+        isinstance(m, ToolMessage) and "ALL_QUESTIONS_COMPLETED" in str(m.content)
         for m in response.get("messages", [])
     )
 
