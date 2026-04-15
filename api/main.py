@@ -18,6 +18,18 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _configure_langsmith():
+    """LangSmith 관찰성 설정을 OS 환경변수로 등록합니다."""
+    if settings.langchain_api_key and settings.langchain_tracing_v2 == "true":
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
+        os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
+        os.environ["LANGCHAIN_ENDPOINT"] = settings.langchain_endpoint
+        logger.info(f"[LangSmith] 추적 활성화 → 프로젝트: {settings.langchain_project}")
+    else:
+        logger.info("[LangSmith] 추적 비활성화 (LANGCHAIN_API_KEY 미설정 또는 LANGCHAIN_TRACING_V2=false)")
+
+
 async def _periodic_cleanup():
     """만료된 세션을 주기적으로 정리합니다 (1시간 간격)."""
     while True:
@@ -29,7 +41,16 @@ async def _periodic_cleanup():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 앱 시작: 그래프 빌드 + 백그라운드 정리 태스크 시작
+    # 앱 시작: LangSmith 설정 → 가이드라인 인덱싱 → 그래프 빌드
+    _configure_langsmith()
+
+    # 안과 임상 가이드라인 ChromaDB 인덱싱 (미인덱싱 시 자동 실행)
+    try:
+        from app.tools.guideline_rag import ensure_guidelines_indexed
+        ensure_guidelines_indexed()
+    except Exception as e:
+        logger.warning(f"[RAG] 가이드라인 인덱싱 실패 (진단 기능은 정상 작동): {e}")
+
     logger.info("서버 시작 - Graph Build")
     from app.graph import build_graph
 

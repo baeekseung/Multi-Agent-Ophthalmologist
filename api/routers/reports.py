@@ -29,4 +29,5 @@ async def get_report(session_id: str):
         session_id=session_id,
         report=session["final_report"],
         status="completed",
+        evaluation=session.get("evaluation_result"),
     )

@@ -154,6 +154,21 @@ def save_report_file(
 
         logger.info(f"[TOOL] save_report_file: DB 저장 완료 → PatientRecord(id={record_id})")
         db_msg = f", DB 저장 완료 (PatientRecord id={record_id})"
+
+        # 벡터 DB에 환자 증례 임베딩 저장 (유사 증례 검색을 위해)
+        try:
+            from app.tools.patient_similarity import add_patient_case
+            add_patient_case(
+                record_id=record_id,
+                patient_name=patient_name,
+                patient_age=patient_age,
+                patient_gender=patient_gender,
+                consultation_summary=consultation_summary,
+                final_report=content,
+            )
+        except Exception as vec_err:
+            logger.warning(f"[TOOL] save_report_file: 벡터 임베딩 저장 실패 (DB 저장은 성공) → {vec_err}")
+
     except Exception as e:
         logger.error(f"[TOOL] save_report_file: DB 저장 실패 → {e}")
         db_msg = f", DB 저장 실패: {e}"

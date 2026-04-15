@@ -5,7 +5,6 @@ from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.types import Command
-from langgraph.graph import END
 
 from app.prompts import (
     DIAGNOSIS_AGENT_INSTRUCTIONS,
@@ -73,5 +72,5 @@ async def diagnosis_agent_node(state: MainState) -> Command:
 
     return Command(
         update={"diagnosis_research_result": final_report},
-        goto=END,
+        goto="report_evaluator",
     )

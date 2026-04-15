@@ -29,6 +29,7 @@ router = APIRouter(prefix="/sessions", tags=["세션"])
 ANALYSIS_NODES = {
     "supervisor", "expert1", "expert2", "expert3",
     "evaluate_consensus_agent", "summarize_consensus_agent", "diagnosis_agent",
+    "report_evaluator",
 }
 
 # 노드별 한국어 레이블
@@ -40,6 +41,7 @@ NODE_LABELS = {
     "evaluate_consensus_agent":  {"title": "전문의 합의 평가",      "phase": "mid_analysis"},
     "summarize_consensus_agent": {"title": "중간 분석 종합",        "phase": "mid_analysis"},
     "diagnosis_agent":           {"title": "심층 진단 연구 완료",   "phase": "deep_diagnosis"},
+    "report_evaluator":          {"title": "진단서 품질 평가 완료", "phase": "deep_diagnosis"},
 }
 
 # 서브에이전트 한국어 레이블
@@ -59,6 +61,7 @@ _NODE_DESC = {
     "evaluate_consensus_agent":  "전문의들의 소견을 종합하여 합의 여부를 평가했습니다.",
     "summarize_consensus_agent": "중간 분석 결과를 종합했습니다.",
     "diagnosis_agent":           "심층 진단 연구 에이전트가 분석을 완료했습니다.",
+    "report_evaluator":          "LLM-as-Judge가 진단 보고서 품질을 평가했습니다.",
 }
 
 
@@ -428,6 +431,9 @@ async def submit_patient_answer(session_id: str, body: AnswerRequest, request: R
 
         except Exception as e:
             logger.error(f"[스트림 워커 오류] session_id={session_id}, {e}")
+            # 세션 상태를 error로 저장하여 재개 가능하도록 처리
+            session["status"] = "error"
+            session["error_message"] = str(e)
             first_result.setdefault("type", "error")
             first_result["error"] = str(e)
             first_event.set()
@@ -527,9 +533,18 @@ async def stream_analysis_progress(session_id: str, request: Request):
                     "diagnosis_research_result",
                     "진단 보고서가 생성되었습니다.",
                 )
+                evaluation_result = graph_state.values.get("evaluation_result")
                 session["status"] = "completed"
                 session["final_report"] = final_report
+                session["evaluation_result"] = evaluation_result
                 logger.info(f"[진단완료-SSE] session_id={session_id}")
+
+                # 평가 등급 로그
+                if evaluation_result and not evaluation_result.get("skipped"):
+                    grade = evaluation_result.get("overall_grade", "?")
+                    score = evaluation_result.get("total_score", "?")
+                    logger.info(f"[보고서평가] session_id={session_id} | 등급: {grade} | 점수: {score}/25")
+
                 yield _sse_event("completed", {"has_report": bool(final_report)})
                 break
 
@@ -584,4 +599,5 @@ async def get_session_status(session_id: str):
         "current_question": session.get("current_question"),
         "patient_info": session["patient_info"],
         "has_report": session["final_report"] is not None,
+        "error_message": session.get("error_message"),
     }

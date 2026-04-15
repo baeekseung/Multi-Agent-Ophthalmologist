@@ -9,6 +9,12 @@ class Settings(BaseSettings):
     database_url: str
     tavily_api_key: str = ""
 
+    # LangSmith 관찰성 설정 (선택사항)
+    langchain_tracing_v2: str = "false"
+    langchain_api_key: str = ""
+    langchain_project: str = "agentic-ophtimus"
+    langchain_endpoint: str = "https://api.smith.langchain.com"
+
     # CORS 허용 오리진
     # .env에서 JSON 배열 형태로 설정: CORS_ORIGINS='["http://localhost:3000","http://localhost:5173"]'
     cors_origins: List[str] = ["http://localhost:3000", "http://localhost:5173"]

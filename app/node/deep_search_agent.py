@@ -13,6 +13,7 @@ from typing_extensions import Annotated, Literal
 from app.utils.get_current_time import get_current_time
 from app.utils.logger import get_logger
 from app.prompts import SUMMARIZE_WEB_SEARCH_PROMPT, MEDICAL_RESEARCHER_INSTRUCTIONS
+from app.tools.guideline_rag import guideline_search_tool
 
 logger = get_logger(__name__)
 
@@ -152,10 +153,10 @@ def think_tool(reflection: str) -> str:
 
 model = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
 
-deep_search_agent_tools = [tavily_search, think_tool]
+deep_search_agent_tools = [tavily_search, think_tool, guideline_search_tool]
 deep_search_agent = {
     "name": "deep-search-agent",
     "description": "Delegate medical research to the sub-agent medical researcher. Only give this researcher one topic at a time.",
     "prompt": MEDICAL_RESEARCHER_INSTRUCTIONS,
-    "tools": ["tavily_search", "think_tool"],
+    "tools": ["tavily_search", "think_tool", "guideline_search_tool"],
 }

@@ -20,8 +20,8 @@ async def main(thread_id: str):
     }
 
     consultation_summary = "아직 진료상담 이력이 없습니다."
-    mid_term_diagnosis_result = INITIAL_CONSULTATION_MESSAGE
-    messages = [HumanMessage(content=f"## previous_consultation_summary: {consultation_summary}\n\n## expert_opinion: {mid_term_diagnosis_result}", name="expert")]
+    initial_consultation_instruction = INITIAL_CONSULTATION_MESSAGE
+    messages = [HumanMessage(content=f"## expert_opinion: {initial_consultation_instruction}\n\n## previous_consultation_summary: {consultation_summary}", name="expert")]
     result = await graph.ainvoke({"messages": messages}, config=config)
 
 if __name__ == "__main__":

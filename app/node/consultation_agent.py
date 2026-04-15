@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 load_dotenv()
+
 from typing import Annotated, Literal
 
 from app.prompts import UPDATE_QUESTIONS_TOOL_DESCRIPTION, CONSULTATION_AGENT_PROMPT
@@ -11,7 +12,7 @@ from app.utils.logger import get_logger
 
 from langchain.agents import create_agent
 from langchain_core.tools import InjectedToolCallId, tool
-from langchain_core.messages import AIMessage, ToolMessage, HumanMessage
+from langchain_core.messages import ToolMessage
 from langgraph.types import Command
 from langchain_openai import ChatOpenAI
 
@@ -98,7 +99,7 @@ def search_previous_records(
 
 
 consultation_agent = create_agent(
-    model=ChatOpenAI(model="gpt-4o", temperature=0.1),
+    model=ChatOpenAI(model="gpt-4o-mini", temperature=0.1),
     tools=[update_questions, search_previous_records],
     system_prompt=CONSULTATION_AGENT_PROMPT,
     state_schema=MainState)

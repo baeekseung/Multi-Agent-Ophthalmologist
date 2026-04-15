@@ -19,6 +19,7 @@ from app.node.mid_level_analysis import (
     summarize_consensus_agent,
 )
 from app.node.diagnosis_agent import diagnosis_agent_node
+from app.node.report_evaluator import report_evaluator_node
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -48,6 +49,7 @@ async def build_graph(checkpointer=None):
     workflow.add_node("summarize_consensus_agent", summarize_consensus_agent)
 
     workflow.add_node("diagnosis_agent", diagnosis_agent_node)
+    workflow.add_node("report_evaluator", report_evaluator_node)
 
     workflow.set_entry_point("consultation_agent")
 

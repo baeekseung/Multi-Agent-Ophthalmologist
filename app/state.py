@@ -6,11 +6,11 @@ from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 
 
-class Question(TypedDict):
-    """A structured question item for tracking progress through consultation.
+class RequestedInformation(TypedDict):
+    """A structured requested information item for tracking progress through consultation.
 
     Attributes:
-        content: Short, specific description of the question
+        content: Short, specific description of the requested information
         status: Current state - pending, in_progress, or completed
     """
     content: str
@@ -79,6 +79,7 @@ class MainState(AgentState):
     previous_records: NotRequired[str]  # 이전 진료기록 조회 결과
     diagnosis_research_result: NotRequired[str]  # diagnosis_agent가 생성한 심층 연구 결과
     final_report: NotRequired[str]  # generate_final_report 노드가 생성하는 최종 진단서
+    evaluation_result: NotRequired[dict]  # report_evaluator가 생성한 LLM-as-Judge 평가 결과
 
 
 def file_reducer(left, right):

@@ -1,3 +1,4 @@
+import asyncio
 from typing import Annotated, NotRequired
 
 from langchain.agents import create_agent
@@ -7,10 +8,21 @@ from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from typing_extensions import TypedDict
 
+# langgraph-supervisor: 에이전트 설명 자동 생성에 활용
+try:
+    from langgraph_supervisor.handoff import create_handoff_tool as _lgs_handoff
+    _HAS_LGS = True
+except ImportError:
+    _HAS_LGS = False
+
 from app.state import DeepAgentState
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# 서브에이전트 재시도 설정
+_MAX_RETRIES = 2
+_RETRY_BASE_DELAY = 2.0  # 초 (지수 백오프 기반)
 
 # adispatch_custom_event: langchain_core >= 0.3 에서 지원
 try:
@@ -20,9 +32,21 @@ except ImportError:
     _HAS_DISPATCH = False
     logger.warning("[TASK] adispatch_custom_event 미지원 버전 — 커스텀 이벤트 비활성화")
 
-TASK_DESCRIPTION_PREFIX = """Delegate a task to a specialized sub-agent with isolated context. Available agents for delegation are:
-{other_agents}
-"""
+
+def _build_task_description(subagents: list) -> str:
+    """langgraph-supervisor의 핸드오프 도구 설명 형식을 활용하여
+    서브에이전트 목록을 포함한 task 도구 설명을 생성합니다."""
+    if _HAS_LGS:
+        # 라이브러리 스타일: 각 에이전트 설명을 핸드오프 도구 형식으로 표현
+        lines = ["Delegate a task to a specialized sub-agent with isolated context."]
+        lines.append("Available agents:")
+        for _agent in subagents:
+            lines.append(f"  - {_agent['name']}: {_agent['description']}")
+        return "\n".join(lines)
+    else:
+        # 폴백: 기존 방식
+        agent_list = "\n".join(f"- {a['name']}: {a['description']}" for a in subagents)
+        return f"Delegate a task to a specialized sub-agent with isolated context. Available agents:\n{agent_list}"
 
 class SubAgent(TypedDict):
     """특화 서브에이전트 설정"""
@@ -67,12 +91,9 @@ def _create_task_tool(tools, subagents: list[SubAgent], model, state_schema):
             state_schema=state_schema,
         )
 
-    # 사용 가능한 서브에이전트 목록을 도구 설명에 활용
-    other_agents_string = [
-        f"- {_agent['name']}: {_agent['description']}" for _agent in subagents
-    ]
+    task_description = _build_task_description(subagents)
 
-    @tool(description=TASK_DESCRIPTION_PREFIX.format(other_agents=other_agents_string))
+    @tool(description=task_description)
     async def task(
         description: str,
         subagent_type: str,
@@ -114,8 +135,34 @@ def _create_task_tool(tools, subagents: list[SubAgent], model, state_schema):
             "todos": state.get("todos", []),
         }
 
-        # 서브에이전트 비동기 실행
-        result = await sub_agent.ainvoke(new_state)
+        # 지수 백오프 재시도 (최대 _MAX_RETRIES회)
+        result = None
+        last_error = None
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                result = await sub_agent.ainvoke(new_state)
+                break
+            except Exception as e:
+                last_error = e
+                if attempt < _MAX_RETRIES:
+                    delay = _RETRY_BASE_DELAY * (2 ** attempt)
+                    logger.warning(
+                        f"[TASK] {subagent_type} 실패 (시도 {attempt + 1}/{_MAX_RETRIES + 1}), "
+                        f"{delay}초 후 재시도: {e}"
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error(f"[TASK] {subagent_type} 최대 재시도 초과: {e}")
+
+        if result is None:
+            # 최대 재시도 후에도 실패 → 부분 결과로 계속 진행 (전체 파이프라인 중단 방지)
+            error_msg = f"[서브에이전트 오류] {subagent_type} 실행 실패: {last_error}"
+            logger.error(f"[TASK] {error_msg}")
+            return Command(
+                update={
+                    "messages": [ToolMessage(error_msg, tool_call_id=tool_call_id)],
+                }
+            )
 
         saved_files = list(result.get("files", {}).keys())
         logger.info(f"[TASK] ← {subagent_type} 완료" + (f" | 저장된 파일: {saved_files}" if saved_files else ""))

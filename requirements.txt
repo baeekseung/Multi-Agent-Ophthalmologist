@@ -1,6 +1,8 @@
 # LLM & Agent 프레임워크
 langchain
 langchain-openai
+langchain-anthropic
+langchain-google-genai
 langgraph
 langchain-core
 langchain-tavily
@@ -18,5 +20,16 @@ fastapi
 uvicorn[standard]
 websockets
 
+# 벡터 DB (RAG 파이프라인)
+chromadb
+langchain-chroma
+
+# LangGraph 확장
+langgraph-supervisor
+
 # 기타 의존성
 typing-extensions
+pydantic-settings
+
+# 테스트
+pytest

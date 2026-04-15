@@ -3,6 +3,8 @@ load_dotenv()
 
 import json
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.types import Command, Send
 from langchain_core.messages import HumanMessage, AIMessage, RemoveMessage
 from langchain.agents import create_agent
@@ -48,8 +50,8 @@ async def create_expert_node(state: MainState, expert_name: str, model) -> Comma
     )
 
 expert1_agent = partial(create_expert_node, expert_name="expert1", model=ChatOpenAI(model="gpt-4o", temperature=0.1))
-expert2_agent = partial(create_expert_node, expert_name="expert2", model=ChatOpenAI(model="gpt-4o", temperature=0.5))
-expert3_agent = partial(create_expert_node, expert_name="expert3", model=ChatOpenAI(model="gpt-4o", temperature=0.9))
+expert2_agent = partial(create_expert_node, expert_name="expert2", model=ChatAnthropic(model="claude-sonnet-4-6", temperature=0.1))
+expert3_agent = partial(create_expert_node, expert_name="expert3", model=ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.1))
 
 # 전문의 이름 리스트 (문자열)
 EXPERT_NAMES = ["expert1", "expert2", "expert3"]
@@ -66,7 +68,8 @@ async def evaluate_consensus_agent(state: MainState) -> Command:
 
     logger.debug(f"전문의 의견:\n{expert_opinions}")
 
-    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    # 합의 평가는 단순 분류 작업 → gpt-4o-mini로 비용 절감
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     structured_llm = llm.with_structured_output(ConsensusDecision)
 
     prompt = ChatPromptTemplate.from_messages(
@@ -118,7 +121,8 @@ async def summarize_consensus_agent(state: MainState) -> Command:
         else:
             continue
 
-    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    # 합의 요약은 정형화된 추출 작업 → gpt-4o-mini로 비용 절감
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     structured_llm = llm.with_structured_output(FinalMidTermDiagnosisResult)
 
     prompt = ChatPromptTemplate.from_messages(
@@ -184,13 +188,29 @@ async def supervisor_agent_node(state: MainState) -> Command:
     logger.info(f"[NODE] supervisor 시작 (라운드 {round_number}, 메시지 {len(supervisor_messages)}건)")
     logger.debug(f"[NODE] supervisor 메시지:\n{messages_pretty_print(supervisor_messages)}")
 
-    # 최대 재질의 횟수 초과 시 강제 종합
+    # 최대 재질의 횟수 초과 시 다수결 기반 종합
     if round_number >= MAX_RECONSULT_ROUNDS:
-        logger.warning(f"[NODE] supervisor - 최대 재질의 횟수({MAX_RECONSULT_ROUNDS}) 도달. 강제 종합 실행")
+        logger.warning(f"[NODE] supervisor - 최대 재질의 횟수({MAX_RECONSULT_ROUNDS}) 도달. 다수결 종합 실행")
+
+        # 각 전문의 마지막 의견 수집하여 불일치 사유와 함께 summarize에 전달
+        disagreement_summary = ""
+        for name in EXPERT_NAMES:
+            msgs = state.get(f"{name}_messages", [])
+            if msgs:
+                last = msgs[-1].content if hasattr(msgs[-1], "content") else str(msgs[-1])
+                disagreement_summary += f"[{name} 최종 의견]\n{last[:300]}\n\n"
+
+        fallback_instruction = (
+            f"최대 재질의 횟수({MAX_RECONSULT_ROUNDS}회)에 도달했습니다.\n"
+            f"전문의 간 완전한 합의에 도달하지 못했으므로, 다수 의견을 기준으로 종합 분석을 작성합니다.\n"
+            f"불일치 사유와 각 전문의 의견을 명시하고, 가장 유력한 진단 방향으로 요약하세요.\n\n"
+            f"[전문의별 최종 의견 요약]\n{disagreement_summary}"
+        )
+
         return Command(
             goto="summarize_consensus_agent",
             update={
-                "supervisor_messages": [AIMessage(content=f"최대 반복 횟수에 도달했습니다. {consultation_turn}번째 Mid-level analysis 결과를 작성합니다.", name="supervisor")],
+                "supervisor_messages": [AIMessage(content=fallback_instruction, name="supervisor")],
                 "round_number": 0
             }
         )
