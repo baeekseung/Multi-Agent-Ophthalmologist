@@ -14,7 +14,7 @@ Agentic Ophtimus is a multi-agent AI system for ophthalmological diagnosis.
 The system conducts structured patient consultations, coordinates a panel of AI expert agents powered by different frontier LLMs (GPT-4o, Claude Sonnet, Gemini), and produces comprehensive diagnostic reports with quality evaluation. A RAG pipeline grounds agent reasoning in curated clinical guidelines for cataract, glaucoma, conjunctivitis, dry eye disease, and retinal diseases.
 
 <p align="left">
-  <img src="./architecture.png" width="80%">
+  <img src="./architecture.png" width="100%">
 </p>
 
 ## System Architecture
