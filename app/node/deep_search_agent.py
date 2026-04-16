@@ -148,10 +148,10 @@ def think_tool(reflection: str) -> str:
     logger.debug(f"[TOOL] think_tool 호출: {reflection[:200]}{'...' if len(reflection) > 200 else ''}")
     return f"Reflection recorded: {reflection}"
 
-deep_search_agent_tools = [tavily_search, think_tool, guideline_search_tool]
+deep_search_agent_tools = [tavily_search, think_tool] # guideline_search_tool (임시 사용 중지)
 deep_search_agent = {
     "name": "deep-search-agent",
     "description": "Delegate medical research to the sub-agent medical researcher. Only give this researcher one topic at a time.",
     "prompt": MEDICAL_RESEARCHER_INSTRUCTIONS,
-    "tools": ["tavily_search", "think_tool", "guideline_search_tool"],
+    "tools": ["tavily_search", "think_tool"], # "guideline_search_tool" (임시 사용 중지)
 }

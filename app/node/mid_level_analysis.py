@@ -113,19 +113,24 @@ async def summarize_consensus_agent(state: MainState) -> Command:
     turn_start = state.get("supervisor_messages_turn_start", 0)
     current_turn_messages = supervisor_messages[turn_start:]
 
-    # 현재 턴에 해당하는 메시지만 추출
-    chat_history = ""
+    # 각 전문의의 마지막(최신) 의견만 추출
+    # 오래된 라운드 의견이 chat_history에 포함되면, 이전 required_information이
+    # consultation_sufficient=False 오판을 유발하는 버그를 방지
+    last_expert_opinions: dict = {}
+    supervisor_instructions: list = []
+
     for m in current_turn_messages:
-        if m.name == "expert1":
-            chat_history += f"[expert1 opinion]\n{m.content}\n\n"
-        elif m.name == "expert2":
-            chat_history += f"[expert2 opinion]\n{m.content}\n\n"
-        elif m.name == "expert3":
-            chat_history += f"[expert3 opinion]\n{m.content}\n\n"
+        if m.name in ["expert1", "expert2", "expert3"]:
+            last_expert_opinions[m.name] = m.content  # 덮어쓰기로 최신 의견 유지
         elif m.name == "supervisor":
-            chat_history += f"[supervisor instruction]\n{m.content}\n\n"
-        else:
-            continue
+            supervisor_instructions.append(m.content)
+
+    chat_history = ""
+    for instruction in supervisor_instructions:
+        chat_history += f"[supervisor instruction]\n{instruction}\n\n"
+    for name in ["expert1", "expert2", "expert3"]:
+        if name in last_expert_opinions:
+            chat_history += f"[{name} opinion]\n{last_expert_opinions[name]}\n\n"
 
     structured_llm = _MINI_LLM.with_structured_output(FinalMidTermDiagnosisResult)
 

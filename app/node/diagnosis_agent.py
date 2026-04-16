@@ -1,3 +1,6 @@
+import os
+from datetime import datetime
+
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
@@ -62,7 +65,21 @@ async def diagnosis_agent_node(state: MainState) -> Command:
     })
 
     final_report = result["messages"][-1].content
-    saved_files = list(result.get("files", {}).keys())
+    generated_files = result.get("files", {})
+    saved_files = list(generated_files.keys())
+
+    # DeepAgentState.files의 모든 파일을 docs/{timestamp}/ 에 저장
+    if generated_files:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        docs_dir = os.path.join("docs", timestamp)
+        os.makedirs(docs_dir, exist_ok=True)
+
+        for filename, content in generated_files.items():
+            file_path = os.path.join(docs_dir, filename)
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+        logger.info(f"[NODE] docs/ 저장 완료 → {docs_dir} ({len(generated_files)}개 파일: {saved_files})")
 
     logger.info(f"[NODE] diagnosis_agent 완료 | 생성된 파일: {saved_files}")
     logger.debug(f"최종 보고서 ({len(final_report)}자):\n{final_report[:500]}{'...' if len(final_report) > 500 else ''}")
