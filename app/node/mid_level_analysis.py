@@ -153,17 +153,31 @@ async def summarize_consensus_agent(state: MainState) -> Command:
         )
     else:
         # 추가 상담 필요 → consultation_agent 복귀
+        # required_questions를 구조화된 섹션으로 expert_opinion_message에 포함
+        questions_section = ""
+        if response.required_questions:
+            qs = "\n".join(f"- {q}" for q in response.required_questions)
+            questions_section = f"\n\n## 추가로 수집해야 하는 정보 (전문의 요청):\n{qs}"
+            logger.debug(f"[NODE] 다음 턴 추가 질문 목록:\n{qs}")
+
         expert_opinion_message = (
-            f"## expert_opinion: {response.diagnosis_result}\n\n"
+            f"## expert_opinion: {response.diagnosis_result}"
+            f"{questions_section}\n\n"
             f"## previous_consultation_summary: {consultation_summary}"
         )
+
+        # mid_term_diagnosis_summary에도 질문 목록 포함 → supervisor State F에서 중복 방지에 활용
+        summary_to_store = response.diagnosis_result
+        if response.required_questions:
+            qs = "\n".join(f"- {q}" for q in response.required_questions)
+            summary_to_store += f"\n\n## 추가 수집 요청 정보:\n{qs}"
 
         next_turn_start = len(supervisor_messages) + 1
         return Command(
             update={
-                "mid_term_diagnosis_summary": response.diagnosis_result,
+                "mid_term_diagnosis_summary": summary_to_store,
                 "messages": [HumanMessage(content=expert_opinion_message, name="expert")],
-                "supervisor_messages": [HumanMessage(content=f"{consultation_turn}번째 Mid-level analysis 결과: {response.diagnosis_result}\n\n분석한 결과를 기반으로 추가적인 진료 상담을 진행합니다.", name="summarize_consensus_agent")],
+                "supervisor_messages": [HumanMessage(content=f"{consultation_turn}번째 Mid-level analysis 결과: {summary_to_store}\n\n분석한 결과를 기반으로 추가적인 진료 상담을 진행합니다.", name="summarize_consensus_agent")],
                 "supervisor_messages_turn_start": next_turn_start,
                 "consultation_turn": consultation_turn + 1,
             },

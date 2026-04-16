@@ -36,7 +36,18 @@ class ConsensusDecision(BaseModel):
 
 class FinalMidTermDiagnosisResult(BaseModel):
     diagnosis_result: str = Field(
-        description="supervisor와 expert들의 대화에서 합의된 분석내용을 한국어로 작성합니다. 분석에서 결정된 환자의 예상질병, 그에 대한 근거를 명확하게 작성합니다. 만약  expert들이 요청한 추가 정보가 존재한다면 내용에 포함시켜 작성합니다.")
+        description="supervisor와 expert들의 대화에서 합의된 분석내용을 한국어로 작성합니다. 분석에서 결정된 환자의 예상질병, 그에 대한 근거를 명확하게 작성합니다.")
+    required_questions: Optional[list[str]] = Field(
+        default=None,
+        description=(
+            "consultation_sufficient=False일 때, 다음 상담 턴에서 consultation_agent가 "
+            "환자에게 반드시 질문해야 하는 항목 목록. "
+            "전문의들이 요청한 required_information을 중복 제거하여 구체적 질문 형태로 작성. "
+            "환자가 즉시 답변 가능한 항목(증상 특성, 발병 상황, 생활습관, 환경 노출 등)만 포함. "
+            "임상검사 결과(쉐르머 테스트, 안압 측정, 세극등 검사 등)는 제외. "
+            "consultation_sufficient=True이면 반드시 None으로 설정."
+        )
+    )
     consultation_sufficient: bool = Field(
         description="""전문의들이 추가로 요청한 정보존재 여부를 기반으로 진료상담을 종료할지 여부를 결정합니다.
         True: 모든 전문의의 마지막 의견에서 required_information이 None인 경우
