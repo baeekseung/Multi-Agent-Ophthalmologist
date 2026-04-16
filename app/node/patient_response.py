@@ -10,15 +10,12 @@ async def patient_response_node(state: MainState) -> Command:
     messages = state.get("messages", [])
     last_message = messages[-1] if messages else None   # 마지막 메시지(AI Message) 가져오기
 
-    # Null 안전성 체크
     if last_message and hasattr(last_message, "content"):
-        prompt_message = f"Doctor: {last_message.content}\nYour answer:"
+        question_text = last_message.content
     else:
-        prompt_message = "이전 대화 내역이 없습니다. 시스템을 다시 시작해주세요."
+        question_text = "이전 대화 내역이 없습니다. 시스템을 다시 시작해주세요."
 
-    # interrupt를 통한 사용자 입력 대기
-    # 그래프 실행이 일시 중지되고 외부(API)에서 Command(resume=...) 를 받을 때까지 대기
-    user_input = interrupt({"question": last_message.content if last_message else prompt_message})
+    user_input = interrupt({"question": question_text})
 
     # API에서 dict 형태로 넘어올 수 있음 (예: {"answer": "..."})
     if isinstance(user_input, dict):

@@ -62,7 +62,7 @@ def save_patient_record(
 
 
 generate_final_report_agent = create_agent(
-    model=ChatOpenAI(model="gpt-4o", temperature=0),
+    model=ChatOpenAI(model="gpt-4o-mini", temperature=0),
     tools=[save_patient_record],
     system_prompt=GENERATE_FINAL_REPORT_PROMPT,
     state_schema=MainState,

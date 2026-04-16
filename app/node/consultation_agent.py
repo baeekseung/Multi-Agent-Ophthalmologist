@@ -1,6 +1,3 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 from typing import Annotated, Literal
 
 from app.prompts import UPDATE_QUESTIONS_TOOL_DESCRIPTION, CONSULTATION_AGENT_PROMPT
@@ -36,8 +33,7 @@ def update_questions(questions: list[Question], tool_call_id: Annotated[str, Inj
     all_completed = all(q["status"] == "completed" for q in questions)
     if all_completed:
         logger.info("[TOOL] update_questions - 모든 질문 완료")
-        # 완료 마커를 ToolMessage content에 포함 (SystemMessage를 끼워넣으면
-        # 두 도구가 동시 호출될 때 ToolMessage 사이에 role이 섞여 OpenAI 400 에러 발생)
+        # 완료 마커를 ToolMessage content에 포함 (SystemMessage를 끼워넣으면 두 도구가 동시 호출될 때 ToolMessage 사이에 role이 섞여 OpenAI 400 에러 발생)
         return Command(update={
             "messages": [ToolMessage(
                 content=f"Updated question list to {questions}\n[STATUS: ALL_QUESTIONS_COMPLETED]",
@@ -99,7 +95,7 @@ def search_previous_records(
 
 
 consultation_agent = create_agent(
-    model=ChatOpenAI(model="gpt-4o-mini", temperature=0.1),
+    model=ChatOpenAI(model="gpt-4o", temperature=0.1),
     tools=[update_questions, search_previous_records],
     system_prompt=CONSULTATION_AGENT_PROMPT,
     state_schema=MainState)
@@ -118,8 +114,7 @@ async def consultation_agent_node(state: MainState) -> Command:
         for m in response.get("messages", [])
     )
 
-    next_node = "summarize_consultation" if completion_triggered else "patient_response"
-    logger.info(f"[NODE] consultation_agent 완료 → {next_node}")
+    logger.info(f"[NODE] consultation_agent 완료 → {'summarize_consultation' if completion_triggered else 'patient_response'}")
 
     if completion_triggered:
         return Command(goto="summarize_consultation", update=response)

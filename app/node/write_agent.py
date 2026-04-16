@@ -1,12 +1,8 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
 from datetime import datetime
 
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import InjectedToolCallId, tool
-from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from typing_extensions import Annotated
@@ -181,10 +177,6 @@ def save_report_file(
     )
 
 
-model = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
-
-# read_collected_files는 analysis_agent_tools에 이미 포함되어 tools_by_name에서 참조됨
-# write_agent_tools에는 write_agent 전용 도구만 포함
 write_agent_tools = [draft_section_tool, submit_report, save_report_file]
 
 write_agent = {

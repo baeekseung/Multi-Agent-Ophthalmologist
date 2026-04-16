@@ -6,11 +6,11 @@ from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 
 
-class RequestedInformation(TypedDict):
-    """A structured requested information item for tracking progress through consultation.
+class Question(TypedDict):
+    """A structured question item for tracking progress through consultation.
 
     Attributes:
-        content: Short, specific description of the requested information
+        content: Short, specific description of the question
         status: Current state - pending, in_progress, or completed
     """
     content: str
@@ -64,10 +64,10 @@ class Todo(TypedDict):
 class MainState(AgentState):
     consultation_next: NotRequired[str]
     consultation_summary: NotRequired[str]
-    consultation_turn: NotRequired[int] = 1
+    consultation_turn: NotRequired[int]
 
     supervisor_messages: Annotated[list[AnyMessage], add_messages]
-    supervisor_messages_turn_start: NotRequired[int]  # 현재 중간분석 턴의 시작 인덱스 (기본값 0)
+    supervisor_messages_turn_start: NotRequired[int]  # 현재 중간분석 턴의 시작 인덱스 (기본값 1)
     expert1_messages: Annotated[list[AnyMessage], add_messages]
     expert2_messages: Annotated[list[AnyMessage], add_messages]
     expert3_messages: Annotated[list[AnyMessage], add_messages]

@@ -1,12 +1,9 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 import json
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.types import Command, Send
-from langchain_core.messages import HumanMessage, AIMessage, RemoveMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain.agents import create_agent
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -19,39 +16,49 @@ from app.prompts import (
 )
 from app.utils.messages_pretty_print import messages_pretty_print
 from app.utils.logger import get_logger
+from app.mcp.sequential_thinking_tool import sequential_thinking_tools
 
 from functools import partial
 
 logger = get_logger(__name__)
 
-# 최대 반복 횟수
 MAX_RECONSULT_ROUNDS = 3
+_MINI_LLM = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 async def create_expert_node(state: MainState, expert_name: str, model) -> Command:
     expert_messages = state.get(f"{expert_name}_messages", [])
     logger.info(f"[NODE] {expert_name} 에이전트 시작 (메시지 {len(expert_messages)}건)")
     logger.debug(f"[NODE] {expert_name} 메시지:\n{messages_pretty_print(expert_messages)}")
-    expert_agent = create_agent(
-        model=model,
-        tools=[],
-        system_prompt=EXPERT_OPINION_PROMPT,
-        state_schema=MainState,
-        response_format=ExpertOpinion
-    )
-    response = await expert_agent.ainvoke({"messages": expert_messages})
+
+    async with sequential_thinking_tools() as tools:
+        expert_agent = create_agent(
+            model=model,
+            tools=tools,
+            system_prompt=EXPERT_OPINION_PROMPT,
+            state_schema=MainState,
+            response_format=ExpertOpinion,
+        )
+
+        response = await expert_agent.ainvoke({"messages": expert_messages})
 
     return Command(
         update={
-            # f"{expert_name}_messages": [AIMessage(content=response["messages"][-1].content, name=expert_name)],
-            f"{expert_name}_messages": response['messages'],
-            "supervisor_messages": [HumanMessage(content=f"[{expert_name} opinion]:\n{response['messages'][-1].content}", name=expert_name)],
+            f"{expert_name}_messages": response["messages"],
+            "supervisor_messages": [
+                HumanMessage(
+                    content=f"[{expert_name} opinion]:\n{response['messages'][-1].content}",
+                    name=expert_name,
+                )
+            ],
         },
         goto="supervisor",
     )
 
-expert1_agent = partial(create_expert_node, expert_name="expert1", model=ChatOpenAI(model="gpt-4o", temperature=0.1))
-expert2_agent = partial(create_expert_node, expert_name="expert2", model=ChatAnthropic(model="claude-sonnet-4-6", temperature=0.1))
-expert3_agent = partial(create_expert_node, expert_name="expert3", model=ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.1))
+expert1_agent = partial(create_expert_node, expert_name="expert1", model=ChatOpenAI(model="gpt-4o-mini", temperature=0.1))
+expert2_agent = partial(create_expert_node, expert_name="expert2", model=ChatOpenAI(model="gpt-4o-mini", temperature=0.2))
+expert3_agent = partial(create_expert_node, expert_name="expert3", model=ChatOpenAI(model="gpt-4o-mini", temperature=0.3))
+# expert2_agent = partial(create_expert_node, expert_name="expert2", model=ChatAnthropic(model="claude-sonnet-4-6", temperature=0.1))
+# expert3_agent = partial(create_expert_node, expert_name="expert3", model=ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.1))
 
 # 전문의 이름 리스트 (문자열)
 EXPERT_NAMES = ["expert1", "expert2", "expert3"]
@@ -68,9 +75,7 @@ async def evaluate_consensus_agent(state: MainState) -> Command:
 
     logger.debug(f"전문의 의견:\n{expert_opinions}")
 
-    # 합의 평가는 단순 분류 작업 → gpt-4o-mini로 비용 절감
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-    structured_llm = llm.with_structured_output(ConsensusDecision)
+    structured_llm = _MINI_LLM.with_structured_output(ConsensusDecision)
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -103,6 +108,7 @@ async def summarize_consensus_agent(state: MainState) -> Command:
     supervisor_messages = state.get("supervisor_messages", [])
     consultation_summary = state.get("consultation_summary", "")
     consultation_turn = state.get("consultation_turn", 1)
+
     # 현재 중간분석 턴의 시작 인덱스 (없으면 0 - 첫 번째 턴)
     turn_start = state.get("supervisor_messages_turn_start", 0)
     current_turn_messages = supervisor_messages[turn_start:]
@@ -121,9 +127,7 @@ async def summarize_consensus_agent(state: MainState) -> Command:
         else:
             continue
 
-    # 합의 요약은 정형화된 추출 작업 → gpt-4o-mini로 비용 절감
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-    structured_llm = llm.with_structured_output(FinalMidTermDiagnosisResult)
+    structured_llm = _MINI_LLM.with_structured_output(FinalMidTermDiagnosisResult)
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -138,40 +142,30 @@ async def summarize_consensus_agent(state: MainState) -> Command:
     logger.info(f"[NODE] summarize_consensus_agent 완료 | 상담 충분: {response.consultation_sufficient}")
     logger.debug(f"최종 진단 합의본:\n{response.diagnosis_result}")
 
-    # supervisor_messages 초기화 (공통)
-    # remove_supervisor_messages = [RemoveMessage(id=m.id) for m in state.get("supervisor_messages", [])]
-
     if response.consultation_sufficient:
         # 상담 충분 → 진단서 생성 후 종료
         return Command(
             update={
                 "mid_term_diagnosis_summary": response.diagnosis_result,
-                "supervisor_messages": [HumanMessage(content=f"이번 Mid-level analysis 결과: {response.diagnosis_result}", name="summarize_consensus_agent")],
+                "supervisor_messages": [HumanMessage(content=f"{consultation_turn}번째 Mid-level analysis 결과: {response.diagnosis_result}", name="summarize_consensus_agent")],
             },
             goto="diagnosis_agent",
         )
     else:
         # 추가 상담 필요 → consultation_agent 복귀
         expert_opinion_message = (
-            f"## previous_consultation_summary: {consultation_summary}\n\n"
-            f"## expert_opinion: {response.diagnosis_result}"
+            f"## expert_opinion: {response.diagnosis_result}\n\n"
+            f"## previous_consultation_summary: {consultation_summary}"
         )
-        # 2차 라운드 시작 전 expert 메시지도 초기화하여 supervisor가 라운드를 명확히 구분하도록 함
-        # remove_expert1 = [RemoveMessage(id=m.id) for m in state.get("expert1_messages", [])]
-        # remove_expert2 = [RemoveMessage(id=m.id) for m in state.get("expert2_messages", [])]
-        # remove_expert3 = [RemoveMessage(id=m.id) for m in state.get("expert3_messages", [])]
-        # 다음 턴의 시작 인덱스: 현재 길이 + 1 (지금 추가될 HumanMessage 포함)
+
         next_turn_start = len(supervisor_messages) + 1
         return Command(
             update={
                 "mid_term_diagnosis_summary": response.diagnosis_result,
                 "messages": [HumanMessage(content=expert_opinion_message, name="expert")],
-                "supervisor_messages": [HumanMessage(content=f"{consultation_turn}번째 Mid-level analysis 결과: {response.diagnosis_result}\n\n추가적으로 요청하신 질문에 대해 답변을 받아 다시 Mid-level analysis를 진행합니다.", name="summarize_consensus_agent")],
+                "supervisor_messages": [HumanMessage(content=f"{consultation_turn}번째 Mid-level analysis 결과: {response.diagnosis_result}\n\n분석한 결과를 기반으로 추가적인 진료 상담을 진행합니다.", name="summarize_consensus_agent")],
                 "supervisor_messages_turn_start": next_turn_start,
                 "consultation_turn": consultation_turn + 1,
-                # "expert1_messages": remove_expert1,
-                # "expert2_messages": remove_expert2,
-                # "expert3_messages": remove_expert3,
             },
             goto="consultation_agent",
         )

@@ -1,9 +1,5 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import InjectedToolCallId, tool
-from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from typing_extensions import Annotated, Literal
@@ -83,8 +79,6 @@ def submit_analysis_result(
         update={"messages": [ToolMessage(result_text, tool_call_id=tool_call_id)]}
     )
 
-
-model = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
 
 analysis_agent_tools = [read_collected_files, analyze_tool, submit_analysis_result]
 

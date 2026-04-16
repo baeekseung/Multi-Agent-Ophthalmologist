@@ -7,6 +7,8 @@ langgraph
 langchain-core
 langchain-tavily
 langchain-community
+langchain-mcp-adapters
+
 
 # 환경 변수
 python-dotenv
@@ -30,6 +32,11 @@ langgraph-supervisor
 # 기타 의존성
 typing-extensions
 pydantic-settings
+psycopg2
+tavily
 
 # 테스트
 pytest
+
+# Sequential Thinking MCP 서버 설치
+# npm install -g @modelcontextprotocol/server-sequential-thinking

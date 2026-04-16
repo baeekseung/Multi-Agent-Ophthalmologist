@@ -8,23 +8,14 @@ from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from typing_extensions import TypedDict
 
-# langgraph-supervisor: 에이전트 설명 자동 생성에 활용
-try:
-    from langgraph_supervisor.handoff import create_handoff_tool as _lgs_handoff
-    _HAS_LGS = True
-except ImportError:
-    _HAS_LGS = False
-
 from app.state import DeepAgentState
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# 서브에이전트 재시도 설정
 _MAX_RETRIES = 2
-_RETRY_BASE_DELAY = 2.0  # 초 (지수 백오프 기반)
+_RETRY_BASE_DELAY = 2.0
 
-# adispatch_custom_event: langchain_core >= 0.3 에서 지원
 try:
     from langchain_core.callbacks.manager import adispatch_custom_event
     _HAS_DISPATCH = True
@@ -34,19 +25,9 @@ except ImportError:
 
 
 def _build_task_description(subagents: list) -> str:
-    """langgraph-supervisor의 핸드오프 도구 설명 형식을 활용하여
-    서브에이전트 목록을 포함한 task 도구 설명을 생성합니다."""
-    if _HAS_LGS:
-        # 라이브러리 스타일: 각 에이전트 설명을 핸드오프 도구 형식으로 표현
-        lines = ["Delegate a task to a specialized sub-agent with isolated context."]
-        lines.append("Available agents:")
-        for _agent in subagents:
-            lines.append(f"  - {_agent['name']}: {_agent['description']}")
-        return "\n".join(lines)
-    else:
-        # 폴백: 기존 방식
-        agent_list = "\n".join(f"- {a['name']}: {a['description']}" for a in subagents)
-        return f"Delegate a task to a specialized sub-agent with isolated context. Available agents:\n{agent_list}"
+    lines = ["Delegate a task to a specialized sub-agent with isolated context.", "Available agents:"]
+    lines.extend(f"  - {a['name']}: {a['description']}" for a in subagents)
+    return "\n".join(lines)
 
 class SubAgent(TypedDict):
     """특화 서브에이전트 설정"""

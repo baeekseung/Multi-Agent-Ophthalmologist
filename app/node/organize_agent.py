@@ -1,9 +1,5 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import InjectedToolCallId, tool
-from langchain_openai import ChatOpenAI
 from langgraph.types import Command
 from typing_extensions import Annotated
 
@@ -68,10 +64,6 @@ def submit_organized_result(
     )
 
 
-model = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
-
-# read_collected_files는 analysis_agent_tools에 이미 포함되어 tools_by_name에서 참조됨
-# organize_agent_tools에는 organize_agent 전용 도구만 포함
 organize_agent_tools = [synthesize_tool, submit_organized_result]
 
 organize_agent = {

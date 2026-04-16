@@ -1,6 +1,3 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
@@ -21,7 +18,7 @@ from app.node.write_agent import write_agent, write_agent_tools
 
 logger = get_logger(__name__)
 
-model = ChatOpenAI(model="gpt-4o", temperature=0.0)
+model = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
 
 # 네 서브에이전트의 도구를 합산하여 tools_by_name 룩업에 모두 등록
 # organize_agent_tools, write_agent_tools에는 read_collected_files 미포함 (analysis_agent_tools에서 이미 제공)
